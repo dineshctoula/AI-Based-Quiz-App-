@@ -7,10 +7,17 @@ import './App.css';
 
 const App: React.FC = () => {
   return (
+    // Router ले पूरा application लाई navigation सक्षम बनाउँछ
     <Router>
+
+      {/* सम्पूर्ण app को main wrapper */}
       <div className="app-shell">
+
+        {/* ===== NAVBAR (Top Menu) ===== */}
         <header className="navbar">
           <div className="nav-container">
+
+            {/* Logo / Brand (Home page मा लैजान्छ) */}
             <Link to="/" className="nav-brand">
               <span className="brand-accent">Mind</span>Spark
             </Link>
