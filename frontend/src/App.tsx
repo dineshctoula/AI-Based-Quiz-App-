@@ -21,10 +21,24 @@ const App: React.FC = () => {
             <Link to="/" className="nav-brand">
               <span className="brand-accent">Mind</span>Spark
             </Link>
+            {/* Navigation menu */}
             <nav className="nav-menu">
-              <Link to="/" className="nav-link">Home</Link>
-              <Link to="/dashboard" className="nav-link">Dashboard</Link>
-              <Link to="/login" className="btn btn-secondary btn-nav">Sign In</Link>
+
+              {/* Home page link */}
+              <Link to="/" className="nav-link">
+                Home
+              </Link>
+
+              {/* Dashboard page link */}
+              <Link to="/dashboard" className="nav-link">
+                Dashboard
+              </Link>
+
+              {/* Login page button (Sign In) */}
+              <Link to="/login" className="btn btn-secondary btn-nav">
+                Sign In
+              </Link>
+
             </nav>
           </div>
         </header>
