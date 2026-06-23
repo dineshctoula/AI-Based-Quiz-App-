@@ -43,17 +43,35 @@ const App: React.FC = () => {
           </div>
         </header>
 
+        {/* ===== MAIN CONTENT AREA ===== */}
         <main className="main-content">
+
+          {/* यहाँ URL अनुसार page change हुन्छ */}
+
           <Routes>
+
+            {/* Home page (LandingPage) */}
             <Route path="/" element={<LandingPage />} />
+
+            {/* Login page */}
             <Route path="/login" element={<LoginPage />} />
+
+            {/* Dashboard page */}
             <Route path="/dashboard" element={<DashboardPage />} />
+
           </Routes>
         </main>
 
+        {/* ===== FOOTER (Bottom section) ===== */}
         <footer className="footer">
           <div className="footer-container">
-            <p>&copy; {new Date().getFullYear()} MindSpark AI. All rights reserved.</p>
+
+            {/* Dynamic year (auto update हुन्छ) */}
+            <p>
+              &copy; {new Date().getFullYear()} MindSpark AI.
+              All rights reserved.
+            </p>
+
           </div>
         </footer>
       </div>
