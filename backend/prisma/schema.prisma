@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// 1. User Model (प्रयोगकर्ता तालिका)
+// ==========================================
+// Holds register info and relationships to created quizzes and attempts.
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String   // Encrypted with bcrypt
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations: One user can create many quizzes and have many attempts
+  quizzes   Quiz[]
+  attempts  Attempt[]
+}
+
+// ==========================================
+// 2. Quiz Model (क्विज तालिका)
+// ==========================================
+// Represents an AI-generated quiz containing MCQ questions.
+model Quiz {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String?
+  topic       String
+  difficulty  String     // e.g. Easy, Medium, Hard
+  timeLimit   Int        // Total time limit for the quiz in seconds
+  createdAt   DateTime   @default(now())
+  
+  // Creator relationship (which User generated this quiz)
+  creatorId   Int
+  creator     User       @relation(fields: [creatorId], references: [id])
+  
+  // Relations: One quiz can contain multiple questions and multiple attempts
+  questions   Question[]
+  attempts    Attempt[]
+}
+
+// ==========================================
+// 3. Question Model (प्रश्न तालिका)
+// ==========================================
+// A single multiple-choice question belonging to a specific quiz.
+model Question {
+  id            Int      @id @default(autoincrement())
+  text          String   // The question prompt/text
+  options       String[] // Array of four options (choice items)
+  correctAnswer String   // The exact correct choice text
+  explanation   String?  // Explanation why the answer is correct (AI-generated)
+  
+  // Quiz relationship (On delete cascade ensures questions are cleaned up if quiz is deleted)
+  quizId        Int
+  quiz          Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// 4. Attempt Model (प्रयास / स्कोर तालिका)
+// ==========================================
+// Records details of a user's attempt at taking a quiz.
+model Attempt {
+  id          Int      @id @default(autoincrement())
+  score       Int      // Obtained score/percentage
+  completedAt DateTime @default(now())
+  
+  // Relations: Linked to user and quiz
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  
+  quizId      Int
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  // Answers stored as a JSON payload to track question-by-question responses
+  // Format: [{ "questionId": 1, "selected": "Paris", "isCorrect": true }]
+  answers     Json
+}
