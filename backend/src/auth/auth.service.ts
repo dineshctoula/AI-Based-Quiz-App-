@@ -1,6 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { SignUpDto } from './dto/signup.dto';
+import { LoginDto } from './dto/login.dto';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
 /**
@@ -10,7 +12,10 @@ import * as bcrypt from 'bcrypt';
  */
 @Injectable()
 export class AuthService {
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private jwtService: JwtService,
+  ) {}
 
   /**
    * Register a new user, hashes their password, and saves them to the database
@@ -45,5 +50,53 @@ export class AuthService {
     // सुरक्षाको लागि पासवर्ड बाहेकको user object return गर्ने
     const { password: _, ...result } = user;
     return result;
+  }
+
+  /**
+   * Validates a user's credentials (email and password).
+   * @param loginDto The credentials containing email and password
+   * @returns The user object (without password) if valid
+   */
+  async validateUser(loginDto: LoginDto) {
+    const { email, password } = loginDto;
+
+    // Find user by email
+    // database मा email अनुसार user खोज्ने
+    const user = await this.usersService.findByEmail(email);
+    if (!user) {
+      throw new UnauthorizedException('अवैध इमेल वा पासवर्ड (Invalid email or password)');
+    }
+
+    // Compare raw password with hashed password stored in DB
+    // raw password र hashed password मिल्छ कि मिल्दैन चेक गर्ने
+    const isPasswordMatching = await bcrypt.compare(password, user.password);
+    if (!isPasswordMatching) {
+      throw new UnauthorizedException('अवैध इमेल वा पासवर्ड (Invalid email or password)');
+    }
+
+    // Return user without password
+    // password बाहेक user details return गर्ने
+    const { password: _, ...result } = user;
+    return result;
+  }
+
+  /**
+   * Generates a signed JWT access token for a validated user.
+   * @param user The validated user object
+   * @returns Access token and user info
+   */
+  async login(user: any) {
+    const payload = { email: user.email, sub: user.id };
+    
+    // Sign the JWT token with payload
+    // user detail बाट token generate गर्ने
+    return {
+      accessToken: this.jwtService.sign(payload),
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      },
+    };
   }
 }
