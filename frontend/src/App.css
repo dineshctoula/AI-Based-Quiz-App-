@@ -10,7 +10,8 @@
   max-width: 1200px;
   width: 100%;
   margin: 0 auto;
-  padding: 100px 24px 60px; /* offset for sticky navbar */
+  padding: 100px 24px 60px;
+  /* offset for sticky navbar */
 }
 
 /* Header & Navigation */
@@ -414,17 +415,17 @@
   .hero-title {
     font-size: 2.5rem;
   }
-  
+
   .dashboard-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
   }
-  
+
   .dashboard-header button {
     width: 100%;
   }
-  
+
   .nav-menu {
     gap: 16px;
   }

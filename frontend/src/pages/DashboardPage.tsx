@@ -1,6 +1,7 @@
 import React from 'react';
 
 export const DashboardPage: React.FC = () => {
+  // yesma fc bhaneko functional component ho  
   return (
     <div className="dashboard-container">
       <header className="dashboard-header">
@@ -10,7 +11,7 @@ export const DashboardPage: React.FC = () => {
         </div>
         <button className="btn btn-primary">+ Generate AI Quiz</button>
       </header>
-      
+
       <div className="stats-row">
         <div className="stat-card">
           <span className="stat-label">Quizzes Completed</span>

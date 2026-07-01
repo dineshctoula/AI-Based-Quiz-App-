@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 /**
  * LoginPage serves as a unified Authentication page.
  * It toggles between "Login" and "Sign Up" modes, rendering fields conditionally.
  * Includes premium glassmorphic elements, state tracking, and error messaging.
+ * Consumes AuthContext to trigger real login/register network operations.
  * 
  * LoginPage ले Login र Sign Up दुबैको काम गर्छ। 'isLogin' state अनुसार form परिवर्तन हुन्छ।
+ * यसले context (useAuth) प्रयोग गरेर real API operations चलाउँछ।
  */
 export const LoginPage: React.FC = () => {
+  const { login, signup } = useAuth();
+
   // ===== STATE CONFIGURATION =====
   const [isLogin, setIsLogin] = useState<boolean>(true); // Mode toggle: true = Login, false = Sign Up
   const [name, setName] = useState<string>('');           // Name (only for Sign Up)
@@ -45,17 +50,18 @@ export const LoginPage: React.FC = () => {
     }
 
     try {
-      // Mock flow for Commit 4 - will be replaced with real AuthContext calls in Commit 5
-      // Commit 4 को लागि mock code - Commit 5 मा यसलाई real API call ले replace गरिनेछ
-      console.log(isLogin ? 'Signing In...' : 'Registering...', { name, email, password });
-      
-      // Simulate API request delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Connect to AuthContext functions based on current form mode
+      // login वा signup API call गराउने
+      if (isLogin) {
+        await login(email, password);
+      } else {
+        await signup(name, email, password);
+      }
       
       // Navigate to dashboard on success
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err?.message || 'केही गडबड भयो (Something went wrong)');
+      setError(err?.message || 'अवैध विवरणहरू वा सर्भर त्रुटि (Invalid credentials or server error)');
     } finally {
       setLoading(false);
     }
@@ -74,7 +80,6 @@ export const LoginPage: React.FC = () => {
     <div className="auth-container">
       <div className="auth-card">
         {/* Title based on isLogin state */}
-        {/* login state अनुसार header text change गर्ने */}
         <h2>{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
         
         <p className="auth-sub">
@@ -83,7 +88,7 @@ export const LoginPage: React.FC = () => {
             : 'Register now to start generating AI-powered custom quizzes'}
         </p>
 
-        {/* ===== ERROR DISPLAY (त्रुटि सन्देश देखाउने ठाउँ) ===== */}
+        {/* ===== ERROR DISPLAY ===== */}
         {error && (
           <div className="auth-error-alert" style={{
             background: 'rgba(239, 68, 68, 0.15)',
@@ -103,7 +108,6 @@ export const LoginPage: React.FC = () => {
         <form onSubmit={handleSubmit} className="auth-form">
           
           {/* ===== NAME FIELD (Only shown in Sign Up mode) ===== */}
-          {/* Sign Up गर्दा मात्र नाम हाल्ने field देखाउने */}
           {!isLogin && (
             <div className="form-group">
               <label htmlFor="name">Full Name</label>
@@ -145,7 +149,6 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* ===== SUBMIT BUTTON ===== */}
-          {/* loading हुँदा disable गर्ने */}
           <button 
             type="submit" 
             className="btn btn-primary btn-block"
@@ -158,7 +161,6 @@ export const LoginPage: React.FC = () => {
         </form>
 
         {/* ===== MODE TOGGLE LINK ===== */}
-        {/* Mode switch गर्ने button (Login -> Signup / Signup -> Login) */}
         <div className="auth-toggle" style={{ marginTop: '20px', textAlign: 'center' }}>
           <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
             {isLogin ? "Don't have an account? " : "Already have an account? "}
