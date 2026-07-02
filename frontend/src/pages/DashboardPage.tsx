@@ -1,7 +1,9 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export const DashboardPage: React.FC = () => {
-  // yesma fc bhaneko functional component ho  
+  const navigate = useNavigate();
+
   return (
     <div className="dashboard-container">
       <header className="dashboard-header">
@@ -9,7 +11,9 @@ export const DashboardPage: React.FC = () => {
           <h1>Welcome back, Quizzer!</h1>
           <p className="subtitle">Ready to test your knowledge or generate a new challenge?</p>
         </div>
-        <button className="btn btn-primary">+ Generate AI Quiz</button>
+        <button className="btn btn-primary" onClick={() => navigate('/generate')}>
+          + Generate AI Quiz
+        </button>
       </header>
 
       <div className="stats-row">
