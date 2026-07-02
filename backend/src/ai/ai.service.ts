@@ -80,15 +80,15 @@ export class AiService {
           // Validate structure of parsed questions
           const validated: GeneratedQuestion[] = parsed.questions.map((q: any) => {
             const text = q.text || 'Unnamed Question';
-            const options = Array.isArray(q.options) && q.options.length === 4 
+            const options: string[] = Array.isArray(q.options) && q.options.length === 4 
               ? q.options 
               : ['Option A', 'Option B', 'Option C', 'Option D'];
             
             // Ensure correct answer is one of the options
-            let correctAnswer = q.correctAnswer || options[0];
+            let correctAnswer: string = q.correctAnswer || options[0];
             if (!options.includes(correctAnswer)) {
               // Fallback to exact match or assign options[0]
-              const match = options.find(opt => opt.toLowerCase() === correctAnswer.toLowerCase());
+              const match = options.find((opt: string) => opt.toLowerCase() === correctAnswer.toLowerCase());
               correctAnswer = match || options[0];
             }
 
