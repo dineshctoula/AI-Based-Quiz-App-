@@ -1063,3 +1063,222 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
 }
+
+/* ===== Quiz Results Page ===== */
+.score-summary-wrapper {
+  padding: 32px;
+}
+
+.score-summary-content {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.circular-score-gauge {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  border: 4px solid var(--secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 24px rgba(6, 182, 212, 0.2);
+  background: rgba(15, 19, 42, 0.5);
+  flex-shrink: 0;
+}
+
+.gauge-number {
+  font-family: var(--font-heading);
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--secondary);
+}
+
+.gauge-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-top: -2px;
+}
+
+.score-feedback-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.score-feedback-text h2 {
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.score-feedback-text p {
+  color: var(--text-secondary);
+  font-size: 0.98rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.score-meta-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.stat-pill {
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  padding: 4px 14px;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+}
+
+/* Question Review Cards */
+.review-card {
+  position: relative;
+  transition: border-color 0.3s ease;
+}
+
+.review-card.review-correct {
+  border-left: 4px solid var(--success);
+}
+
+.review-card.review-incorrect {
+  border-left: 4px solid var(--error);
+}
+
+.review-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.review-option-card-static {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--glass-border);
+  padding: 12px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  width: 100%;
+}
+
+.review-option-card-static.correct-option {
+  background: rgba(16, 185, 129, 0.06);
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.05);
+}
+
+.review-option-card-static.incorrect-option {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.option-letter-static {
+  font-weight: 800;
+  font-family: var(--font-heading);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--glass-border);
+  font-size: 0.85rem;
+}
+
+.review-option-card-static.correct-option .option-letter-static {
+  color: #fff;
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.review-option-card-static.incorrect-option .option-letter-static {
+  color: #fff;
+  background: var(--error);
+  border-color: var(--error);
+}
+
+.option-text-static {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.review-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.user-select-tag {
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: var(--primary);
+}
+
+.correct-tag {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: var(--success);
+}
+
+/* AI Tutor explanation block */
+.ai-explanation-box {
+  background: rgba(6, 182, 212, 0.04);
+  border: 1px solid rgba(6, 182, 212, 0.15);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  margin-top: 20px;
+  box-shadow: inset 0 1px 2px rgba(6, 182, 212, 0.05);
+}
+
+.mini-ai-sparkle {
+  animation: pulse 1.5s infinite ease-in-out;
+  display: inline-block;
+}
+
+/* Responsiveness for Dashboard & Results */
+@media (max-width: 900px) {
+  .dashboard-split-layout {
+    grid-template-columns: 1fr !important;
+    gap: 40px !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .score-summary-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 20px;
+  }
+  
+  .review-option-card-static {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .review-tag {
+    margin-left: 0 !important;
+    margin-top: 4px;
+  }
+}

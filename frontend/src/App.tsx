@@ -5,6 +5,7 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { GenerateQuizPage } from './pages/GenerateQuizPage';
 import { PlayQuizPage } from './pages/PlayQuizPage';
+import { QuizResultPage } from './pages/QuizResultPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import './App.css';
@@ -103,6 +104,16 @@ import './App.css';
                element={
                  <ProtectedRoute>
                    <PlayQuizPage />
+                 </ProtectedRoute>
+               } 
+             />
+
+             {/* Protected: Quiz Results page wrapped in ProtectedRoute */}
+             <Route 
+               path="/quiz/result" 
+               element={
+                 <ProtectedRoute>
+                   <QuizResultPage />
                  </ProtectedRoute>
                } 
              />
