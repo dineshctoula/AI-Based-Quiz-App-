@@ -1,7 +1,8 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { GenerateQuizDto } from './dto/generate-quiz.dto';
+import { SubmitAttemptDto } from './dto/submit-attempt.dto';
 
 @Injectable()
 export class QuizzesService {
@@ -71,5 +72,181 @@ export class QuizzesService {
         error.message || 'An error occurred during quiz generation | Quiz generate गर्दा केही समस्या आयो',
       );
     }
+  }
+
+  /**
+   * Retrieves all quizzes in the database with their creator details and question count.
+   * 
+   * Database मा भएका सबै quiz हरू, तिनीहरूका creator र question count सहित तान्छ।
+   * 
+   * @returns List of all quizzes (सबै quiz हरूको सूची)
+   */
+  async findAll() {
+    this.logger.log('Retrieving all quizzes');
+    return this.prisma.quiz.findMany({
+      include: {
+        creator: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        _count: {
+          select: {
+            questions: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  /**
+   * Retrieves a single quiz by ID, sanitizing questions to hide correct answers and explanations.
+   * 
+   * ID अनुसार एउटा quiz तान्छ, तर cheating रोक्न correct answers र explanations हटाउँछ।
+   * 
+   * @param id Quiz ID (क्विजको ID)
+   * @returns Sanitized quiz details (संशोधित क्विज विवरण)
+   */
+  async findOne(id: number) {
+    this.logger.log(`Retrieving sanitized quiz with ID: ${id}`);
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        questions: {
+          select: {
+            id: true,
+            text: true,
+            options: true,
+            // Exclude correctAnswer and explanation to prevent client inspection cheating
+            // client-side inspection बाट cheating रोक्न correct answer र explanation लुकाइन्छ
+          },
+        },
+      },
+    });
+
+    if (!quiz) {
+      throw new NotFoundException(`Quiz with ID ${id} not found | ID ${id} भएको quiz भेटिएन`);
+    }
+
+    return quiz;
+  }
+
+  /**
+   * Grades a user's quiz attempt, calculates score, and stores the graded results.
+   * 
+   * User को quiz attempt लाई grade गर्छ, score calculate गर्छ र database मा save गर्छ।
+   * 
+   * @param userId The ID of the user submitting the attempt (प्रयास गर्ने user को ID)
+   * @param quizId The ID of the quiz being attempted (दिन लागिएको quiz को ID)
+   * @param dto The user's selections/responses (user ले रोजेका उत्तरहरू)
+   * @returns The saved attempt with full graded feedback (grade गरिएको feedback सहितको attempt)
+   */
+  async submitAttempt(userId: number, quizId: number, dto: SubmitAttemptDto) {
+    this.logger.log(`Grading attempt for user ${userId} on quiz ${quizId}`);
+    
+    // Fetch quiz with full question details containing correctAnswer/explanation
+    // correct answer र explanation सहित full question details database बाट तान्ने
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      include: {
+        questions: true,
+      },
+    });
+
+    if (!quiz) {
+      throw new NotFoundException(`Quiz with ID ${quizId} not found | ID ${quizId} भएको quiz भेटिएन`);
+    }
+
+    let correctCount = 0;
+
+    // Grade each question response
+    // प्रत्येक प्रश्नको उत्तर जाँच्ने
+    const gradedAnswers = quiz.questions.map((question) => {
+      const userAnswer = dto.answers.find((a) => a.questionId === question.id);
+      const selectedOption = userAnswer ? userAnswer.selectedOption : '';
+      
+      const isCorrect = selectedOption.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase();
+      if (isCorrect) {
+        correctCount++;
+      }
+
+      return {
+        questionId: question.id,
+        text: question.text,
+        options: question.options,
+        selectedOption,
+        correctAnswer: question.correctAnswer,
+        explanation: question.explanation,
+        isCorrect,
+      };
+    });
+
+    const totalQuestions = quiz.questions.length;
+    const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+
+    // Save attempt record in database
+    // score र answers विवरण database मा Attempt model मा save गर्ने
+    const attempt = await this.prisma.attempt.create({
+      data: {
+        score,
+        userId,
+        quizId,
+        answers: gradedAnswers, // Saved as Json (Prisma schema support)
+      },
+      include: {
+        quiz: {
+          select: {
+            title: true,
+            topic: true,
+          },
+        },
+      },
+    });
+
+    this.logger.log(`Attempt graded successfully for user ${userId}. Score: ${score}%`);
+    return attempt;
+  }
+
+  /**
+   * Retrieves all attempts made by a specific user.
+   * 
+   * कुनै निश्चित user ले दिएका सबै quiz attempts को history तान्छ।
+   * 
+   * @param userId The ID of the user (user को ID)
+   * @returns User's quiz attempt history (user को quiz attempt history)
+   */
+  async findUserAttempts(userId: number) {
+    this.logger.log(`Retrieving attempt history for user ${userId}`);
+    return this.prisma.attempt.findMany({
+      where: { userId },
+      include: {
+        quiz: {
+          select: {
+            id: true,
+            title: true,
+            topic: true,
+            difficulty: true,
+            _count: {
+              select: {
+                questions: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        completedAt: 'desc',
+      },
+    });
   }
 }
