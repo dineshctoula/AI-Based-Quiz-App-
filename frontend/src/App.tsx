@@ -4,6 +4,7 @@ import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { GenerateQuizPage } from './pages/GenerateQuizPage';
+import { PlayQuizPage } from './pages/PlayQuizPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import './App.css';
@@ -92,6 +93,16 @@ import './App.css';
                element={
                  <ProtectedRoute>
                    <GenerateQuizPage />
+                 </ProtectedRoute>
+               } 
+             />
+
+             {/* Protected: Quiz Taking page wrapped in ProtectedRoute */}
+             <Route 
+               path="/quiz/:id" 
+               element={
+                 <ProtectedRoute>
+                   <PlayQuizPage />
                  </ProtectedRoute>
                } 
              />

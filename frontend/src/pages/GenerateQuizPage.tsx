@@ -191,8 +191,7 @@ export const GenerateQuizPage: React.FC = () => {
               </button>
               <button 
                 onClick={() => {
-                  alert("Quiz Playing will be implemented on Day 5! | क्विज खेल्ने फिचर Day 5 मा थपिनेछ!");
-                  navigate('/dashboard');
+                  navigate(`/quiz/${generatedQuiz.id}`);
                 }} 
                 className="btn btn-primary"
               >
