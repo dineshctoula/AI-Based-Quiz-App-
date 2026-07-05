@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { GenerateQuizPage } from './pages/GenerateQuizPage';
 import { PlayQuizPage } from './pages/PlayQuizPage';
 import { QuizResultPage } from './pages/QuizResultPage';
+import { LeaderboardPage } from './pages/LeaderboardPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import './App.css';
@@ -36,12 +37,17 @@ import './App.css';
                  Home
                </Link>
  
-               {/* Show Dashboard link only if user is logged in */}
-               {/* user logged in छ भने मात्र Dashboard link देखाउने */}
+               {/* Show Dashboard and Leaderboard links only if user is logged in */}
+               {/* user logged in छ भने मात्र Dashboard र Leaderboard links देखाउने */}
                {user && (
-                 <Link to="/dashboard" className="nav-link">
-                   Dashboard
-                 </Link>
+                 <>
+                   <Link to="/dashboard" className="nav-link">
+                     Dashboard
+                   </Link>
+                   <Link to="/leaderboard" className="nav-link">
+                     Leaderboard
+                   </Link>
+                 </>
                )}
  
                {/* Conditional Authentication Action buttons */}
@@ -114,6 +120,16 @@ import './App.css';
                element={
                  <ProtectedRoute>
                    <QuizResultPage />
+                 </ProtectedRoute>
+               } 
+             />
+
+             {/* Protected: Leaderboard page wrapped in ProtectedRoute */}
+             <Route 
+               path="/leaderboard" 
+               element={
+                 <ProtectedRoute>
+                   <LeaderboardPage />
                  </ProtectedRoute>
                } 
              />
