@@ -43,6 +43,28 @@ export class QuizzesController {
   }
 
   /**
+   * Endpoint to retrieve the global leaderboard.
+   * GET /api/quizzes/leaderboard
+   * 
+   * Global leaderboard र्‍याङ्किङ तान्ने endpoint.
+   */
+  @Get('leaderboard')
+  async getLeaderboard() {
+    return this.quizzesService.getLeaderboard();
+  }
+
+  /**
+   * Endpoint to retrieve the logged-in user's performance statistics.
+   * GET /api/quizzes/stats/performance
+   * 
+   * Login भएको user को बिषयगत बलियो पक्ष र score trends analytics तान्ने endpoint.
+   */
+  @Get('stats/performance')
+  async getPerformanceStats(@CurrentUser() user: { id: number; email: string }) {
+    return this.quizzesService.getPerformanceStats(user.id);
+  }
+
+  /**
    * Endpoint to retrieve the logged-in user's quiz attempt history.
    * GET /api/quizzes/attempts/my
    * 

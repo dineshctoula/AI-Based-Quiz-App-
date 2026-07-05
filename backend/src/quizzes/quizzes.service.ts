@@ -249,4 +249,134 @@ export class QuizzesService {
       },
     });
   }
+
+  /**
+   * Calculates global leaderboard rankings based on average score and completed quizzes.
+   * 
+   * Global leaderboard rankings calculate गर्छ - average score र completed quizzes को आधारमा।
+   * 
+   * @returns Top 10 user rankings (शीर्ष १० user हरूको र्‍याङ्किङ)
+   */
+  async getLeaderboard() {
+    this.logger.log('Calculating global leaderboard rankings');
+    try {
+      // Fetch all users with their attempts to calculate averages
+      // सबै user हरू र तिनीहरूका attempts database बाट तान्ने
+      const users = await this.prisma.user.findMany({
+        select: {
+          id: true,
+          name: true,
+          attempts: {
+            select: {
+              score: true,
+            },
+          },
+        },
+      });
+
+      const rankings = users
+        .map((user) => {
+          const totalCompleted = user.attempts.length;
+          const averageScore =
+            totalCompleted > 0
+              ? Math.round(user.attempts.reduce((sum, a) => sum + a.score, 0) / totalCompleted)
+              : 0;
+
+          return {
+            userId: user.id,
+            name: user.name,
+            totalCompleted,
+            averageScore,
+          };
+        })
+        // Only show users who have actually taken at least one quiz
+        // कम्तीमा एउटा quiz खेलेका user हरूलाई मात्र leaderboard मा देखाउने
+        .filter((u) => u.totalCompleted > 0)
+        // Sort by average score first, then by total completed quizzes
+        // पहिले average score, त्यसपछि total quizzes completed को आधारमा sort गर्ने
+        .sort((a, b) => {
+          if (b.averageScore !== a.averageScore) {
+            return b.averageScore - a.averageScore;
+          }
+          return b.totalCompleted - a.totalCompleted;
+        })
+        .slice(0, 10); // Return top 10
+
+      return rankings;
+    } catch (error) {
+      this.logger.error('Failed to calculate leaderboard', error);
+      throw new InternalServerErrorException(
+        'Failed to load leaderboard | Leaderboard गणना गर्दा समस्या आयो',
+      );
+    }
+  }
+
+  /**
+   * Aggregates user performance statistics grouped by topic, and fetches recent score progress.
+   * 
+   * User को performance analytics: बिषयगत (topic) बलियो पक्ष र हालसालैका attempts को score history।
+   * 
+   * @param userId The ID of the user (user को ID)
+   * @returns Aggregated topic strengths and score trends (बिषयगत दक्षता र score progression)
+   */
+  async getPerformanceStats(userId: number) {
+    this.logger.log(`Fetching performance statistics for user ${userId}`);
+    try {
+      const attempts = await this.prisma.attempt.findMany({
+        where: { userId },
+        include: {
+          quiz: {
+            select: {
+              topic: true,
+            },
+          },
+        },
+        orderBy: {
+          completedAt: 'asc', // Ascending for progress timeline
+        },
+      });
+
+      // 1. Calculate topic strengths (average score per topic)
+      // प्रत्येक topic मा user को average score (दक्षता) calculate गर्ने
+      const topicAggregates: Record<string, { totalScore: number; count: number }> = {};
+      
+      attempts.forEach((attempt) => {
+        const topic = attempt.quiz.topic;
+        if (!topicAggregates[topic]) {
+          topicAggregates[topic] = { totalScore: 0, count: 0 };
+        }
+        topicAggregates[topic].totalScore += attempt.score;
+        topicAggregates[topic].count += 1;
+      });
+
+      const strengths = Object.keys(topicAggregates).map((topic) => ({
+        topic,
+        averageScore: Math.round(topicAggregates[topic].totalScore / topicAggregates[topic].count),
+        attemptsCount: topicAggregates[topic].count,
+      }));
+
+      // Sort strengths to display strongest first
+      // सबैभन्दा बढी score ल्याएको topic लाई पहिले राख्ने गरी sort गर्ने
+      strengths.sort((a, b) => b.averageScore - a.averageScore);
+
+      // 2. Score progression trend (limit to last 6 attempts for chart sizing)
+      // हालसालैका बढीमा ६ वटा attempts को score progression history
+      const history = attempts.slice(-6).map((attempt) => ({
+        id: attempt.id,
+        score: attempt.score,
+        completedAt: attempt.completedAt,
+        quizTitle: attempt.quiz.topic,
+      }));
+
+      return {
+        strengths,
+        history,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to calculate performance stats for user ${userId}`, error);
+      throw new InternalServerErrorException(
+        'Failed to compile performance stats | Performance analytics तयार पार्दा समस्या आयो',
+      );
+    }
+  }
 }
