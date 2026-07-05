@@ -50,8 +50,14 @@ export const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Fetch quizzes and attempts data in parallel
-  // quizzes र user का attempts details parallel रूपमा fetch गर्ने
+  interface PerformanceStats {
+    strengths: Array<{ topic: string; averageScore: number; attemptsCount: number }>;
+    history: Array<{ id: number; score: number; completedAt: string; quizTitle?: string }>;
+  }
+  const [perfStats, setPerfStats] = useState<PerformanceStats | null>(null);
+
+  // Fetch quizzes, attempts, and performance stats in parallel
+  // quizzes, attempts र user performance stats parallel रूपमा fetch गर्ने
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -59,20 +65,23 @@ export const DashboardPage: React.FC = () => {
           'Authorization': `Bearer ${token}`,
         };
 
-        const [quizzesRes, attemptsRes] = await Promise.all([
+        const [quizzesRes, attemptsRes, perfRes] = await Promise.all([
           fetch(`${API_URL}/quizzes`, { headers }),
           fetch(`${API_URL}/quizzes/attempts/my`, { headers }),
+          fetch(`${API_URL}/quizzes/stats/performance`, { headers }),
         ]);
 
-        if (!quizzesRes.ok || !attemptsRes.ok) {
+        if (!quizzesRes.ok || !attemptsRes.ok || !perfRes.ok) {
           throw new Error('Failed to load dashboard data');
         }
 
         const quizzesData = await quizzesRes.json();
         const attemptsData = await attemptsRes.json();
+        const perfData = await perfRes.json();
 
         setQuizzes(quizzesData);
         setAttempts(attemptsData);
+        setPerfStats(perfData);
       } catch (err: any) {
         console.error(err);
         setErrorMsg(err.message || 'Error loading dashboard | Dashboard लोड गर्दा समस्या आयो');
@@ -102,6 +111,201 @@ export const DashboardPage: React.FC = () => {
   };
 
   const rank = getRank(averageScore, totalCompleted);
+
+  // Helper to render the custom SVG performance trend chart
+  // User को score trend देखाउन custom SVG Chart render गर्ने function
+  const renderTrendChart = () => {
+    if (!perfStats || !perfStats.history || perfStats.history.length === 0) {
+      return (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+          No quiz history available to map trend | ट्रेन्ड देखाउन पर्याप्त डेटा उपलब्ध छैन।
+        </div>
+      );
+    }
+
+    const history = perfStats.history;
+    const width = 500;
+    const height = 200;
+    const paddingLeft = 40;
+    const paddingRight = 20;
+    const paddingTop = 20;
+    const paddingBottom = 35;
+    
+    const chartWidth = width - paddingLeft - paddingRight;
+    const chartHeight = height - paddingTop - paddingBottom;
+
+    // Generate coordinate points for each history item
+    // coordinate points गणना गर्ने
+    const points = history.map((item, index) => {
+      const x = paddingLeft + (history.length > 1 ? (index / (history.length - 1)) * chartWidth : chartWidth / 2);
+      const y = paddingTop + chartHeight - (item.score / 100) * chartHeight;
+      return { x, y, score: item.score, date: new Date(item.completedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), topic: item.quizTitle || 'Quiz' };
+    });
+
+    // Create line path string
+    // SVG line path string बनाउने
+    const pathD = points.reduce((acc, p, i) => {
+      return i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
+    }, '');
+
+    // Create gradient area closed path
+    // gradient area fill गर्न closed path बनाउने
+    const areaD = points.length > 0 
+      ? `${pathD} L ${points[points.length - 1].x} ${paddingTop + chartHeight} L ${points[0].x} ${paddingTop + chartHeight} Z`
+      : '';
+
+    // Horizontal grid line values
+    const gridLines = [0, 25, 50, 75, 100];
+
+    return (
+      <div className="svg-chart-container" style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
+        <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="100%">
+          <defs>
+            <linearGradient id="chart-area-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.0" />
+            </linearGradient>
+            <linearGradient id="line-stroke-grad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="var(--primary)" />
+              <stop offset="100%" stopColor="var(--secondary)" />
+            </linearGradient>
+          </defs>
+
+          {/* Horizontal grid lines and Y-axis labels */}
+          {gridLines.map((val) => {
+            const y = paddingTop + chartHeight - (val / 100) * chartHeight;
+            return (
+              <g key={val}>
+                <line 
+                  x1={paddingLeft} 
+                  y1={y} 
+                  x2={width - paddingRight} 
+                  y2={y} 
+                  stroke="rgba(255, 255, 255, 0.05)" 
+                  strokeDasharray="4 4" 
+                />
+                <text 
+                  x={paddingLeft - 10} 
+                  y={y + 4} 
+                  fill="var(--text-muted)" 
+                  fontSize="10" 
+                  textAnchor="end"
+                >
+                  {val}%
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Filled Area Gradient */}
+          {areaD && <path d={areaD} fill="url(#chart-area-grad)" />}
+
+          {/* Stroke Path Line */}
+          {pathD && (
+            <path 
+              d={pathD} 
+              fill="none" 
+              stroke="url(#line-stroke-grad)" 
+              strokeWidth="3" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+            />
+          )}
+
+          {/* Interactive dots and values */}
+          {points.map((p, idx) => (
+            <g key={idx} className="chart-dot-group">
+              {/* Highlight line on hover */}
+              <line
+                x1={p.x}
+                y1={paddingTop}
+                x2={p.x}
+                y2={paddingTop + chartHeight}
+                stroke="rgba(6, 182, 212, 0.15)"
+                strokeWidth="1.5"
+                className="hover-guide-line"
+              />
+              {/* Background glowing pulse dot */}
+              <circle 
+                cx={p.x} 
+                cy={p.y} 
+                r="6" 
+                fill="var(--secondary)" 
+                opacity="0.3"
+                className="dot-glow"
+              />
+              {/* Foreground point dot */}
+              <circle 
+                cx={p.x} 
+                cy={p.y} 
+                r="4" 
+                fill="var(--secondary)" 
+                stroke="#fff" 
+                strokeWidth="1.5" 
+                style={{ cursor: 'pointer' }}
+              />
+              {/* Score label above dot */}
+              <text
+                x={p.x}
+                y={p.y - 8}
+                fill="var(--text-primary)"
+                fontSize="9"
+                fontWeight="700"
+                textAnchor="middle"
+                className="dot-val-label"
+              >
+                {p.score}%
+              </text>
+              {/* Date label at X-axis */}
+              <text 
+                x={p.x} 
+                y={height - 12} 
+                fill="var(--text-muted)" 
+                fontSize="9" 
+                textAnchor="middle"
+              >
+                {p.date}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    );
+  };
+
+  // Helper to render the topic strengths progress bar list
+  // User को subject category अनुसारको average score progress display गर्ने
+  const renderStrengths = () => {
+    if (!perfStats || !perfStats.strengths || perfStats.strengths.length === 0) {
+      return (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+          No stats available to determine strengths | कुनै विश्लेषण विवरण उपलब्ध छैन।
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {perfStats.strengths.map((item, idx) => (
+          <div key={idx} className="strength-item-row">
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '6px' }}>
+              <span style={{ fontWeight: 600, textTransform: 'capitalize' }}>{item.topic}</span>
+              <span style={{ color: 'var(--secondary)', fontWeight: 700 }}>{item.averageScore}% avg</span>
+            </div>
+            <div className="progress-bar-container" style={{ height: '8px' }}>
+              <div 
+                className="progress-bar-fill" 
+                style={{ 
+                  width: `${item.averageScore}%`, 
+                  background: item.averageScore >= 80 ? 'linear-gradient(90deg, var(--success), #34d399)' : item.averageScore >= 50 ? 'linear-gradient(90deg, var(--secondary), var(--primary))' : 'linear-gradient(90deg, var(--error), #f87171)'
+                }}
+              ></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -152,11 +356,32 @@ export const DashboardPage: React.FC = () => {
           <span className="stat-label">Average Score</span>
           <span className="stat-val">{averageScore}%</span>
         </div>
-        <div className="stat-card">
-          <span className="stat-label">Global Rank</span>
+        <div className="stat-card" style={{ cursor: 'pointer', position: 'relative' }} onClick={() => navigate('/leaderboard')}>
+          <span className="stat-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            Global Rank <span style={{ fontSize: '0.7rem', color: 'var(--secondary)', textTransform: 'none', border: '1px solid var(--secondary)', padding: '1px 6px', borderRadius: '4px' }}>View Leaderboard →</span>
+          </span>
           <span className="stat-val">{rank}</span>
         </div>
       </div>
+
+      {/* 2. Performance Analytics Panels */}
+      {/* User Performance र analytics panels */}
+      {attempts.length > 0 && (
+        <div className="dashboard-split-layout" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '32px', marginTop: '16px' }}>
+          <section className="dashboard-section">
+            <h2>Score Progression Trend</h2>
+            <div className="wizard-card-wrapper" style={{ padding: '24px 30px' }}>
+              {renderTrendChart()}
+            </div>
+          </section>
+          <section className="dashboard-section">
+            <h2>Strengths by Topic</h2>
+            <div className="wizard-card-wrapper" style={{ padding: '24px 30px' }}>
+              {renderStrengths()}
+            </div>
+          </section>
+        </div>
+      )}
 
       <div className="dashboard-split-layout" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '32px', marginTop: '16px' }}>
         
