@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, X, MessageSquare, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { MarkdownRenderer } from '../utils/markdown';
 
 // API base URL matching AuthContext and other pages
 // AuthContext र अन्य pages सँग मिल्ने API base URL
@@ -199,9 +200,7 @@ How can I help you understand this topic better? Ask me anything about it!`,
                 {msg.role === 'user' ? 'ME' : 'AI'}
               </div>
               <div className="chat-bubble">
-                <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                  {msg.text}
-                </p>
+                <MarkdownRenderer text={msg.text} />
               </div>
             </div>
           ))}
