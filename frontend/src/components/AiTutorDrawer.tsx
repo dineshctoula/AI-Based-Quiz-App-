@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, X, MessageSquare, Loader2, AlertCircle } from 'lucide-react';
+import { Send, X, MessageSquare, Loader2, AlertCircle, Volume2, VolumeX, Mic, MicOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { MarkdownRenderer } from '../utils/markdown';
 
@@ -45,6 +45,112 @@ export const AiTutorDrawer: React.FC<AiTutorDrawerProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // States and Refs for Speech Capabilities (TTS / STT)
+  // आवाज सेवा (TTS / STT) का लागि states र refs
+  const [speakingMessageIndex, setSpeakingMessageIndex] = useState<number | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  // Initialize SpeechRecognition on mount
+  // component load हुँदा SpeechRecognition initialize गर्ने
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInputValue((prev) => (prev ? `${prev} ${transcript}` : transcript));
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, []);
+
+  // Text-to-Speech handler
+  // मेसेज ठूलो स्वरमा वाचन गर्ने (TTS) handler
+  const handleSpeak = (text: string, index: number) => {
+    if ('speechSynthesis' in window) {
+      if (speakingMessageIndex === index) {
+        window.speechSynthesis.cancel();
+        setSpeakingMessageIndex(null);
+      } else {
+        window.speechSynthesis.cancel();
+        
+        const cleanText = text
+          .replace(/\*\*|`|_|#/g, '')
+          .replace(/\[Mock AI Tutor\]/i, 'Mock AI Tutor');
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        const hasNepali = /[\u0900-\u097F]/.test(cleanText);
+        if (hasNepali) {
+          utterance.lang = 'ne-NP';
+        } else {
+          utterance.lang = 'en-US';
+        }
+
+        utterance.onend = () => {
+          setSpeakingMessageIndex(null);
+        };
+        utterance.onerror = () => {
+          setSpeakingMessageIndex(null);
+        };
+
+        setSpeakingMessageIndex(index);
+        window.speechSynthesis.speak(utterance);
+      }
+    } else {
+      alert('Text-to-speech is not supported in this browser | यो ब्राउजरमा वाचन सेवा उपलब्ध छैन।');
+    }
+  };
+
+  // Toggle listening state for voice typing
+  // आवाज टाइप सेवा (STT) सुरु वा बन्द गर्ने
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert('Speech recognition is not supported in this browser. Please use Chrome or Edge | तपाईंको ब्राउजरमा आवाज पहिचान सेवा छैन।');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      setErrorMsg(null);
+      recognitionRef.current.start();
+    }
+  };
+
+  // Stop speaking and listening when component unmounts or drawer closes
+  // Drawer बन्द हुँदा वा component हट्दा आवाज बन्द गर्ने
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      if (recognitionRef.current && isListening) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [isListening]);
 
   // Reset chat and load initial greeting when drawer opens or question changes
   // Drawer खुल्दा वा नयाँ प्रश्न छान्दा च्याट रिसेट र स्वागत मेसेज लोड गर्ने
@@ -199,8 +305,34 @@ How can I help you understand this topic better? Ask me anything about it!`,
               <div className="chat-bubble-avatar">
                 {msg.role === 'user' ? 'ME' : 'AI'}
               </div>
-              <div className="chat-bubble">
-                <MarkdownRenderer text={msg.text} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '85%' }}>
+                <div className="chat-bubble">
+                  <MarkdownRenderer text={msg.text} />
+                </div>
+                {/* TTS Reader button */}
+                <button
+                  type="button"
+                  onClick={() => handleSpeak(msg.text, index)}
+                  className="chat-tts-btn"
+                  style={{
+                    alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                    background: 'transparent',
+                    border: 'none',
+                    color: speakingMessageIndex === index ? 'var(--secondary)' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '0.75rem',
+                    padding: '2px 4px',
+                    borderRadius: '4px',
+                    transition: 'all 0.2s ease',
+                  }}
+                  title={speakingMessageIndex === index ? 'Stop speaking' : 'Read message aloud'}
+                >
+                  {speakingMessageIndex === index ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                  <span>{speakingMessageIndex === index ? 'Stop | रोक्नुहोस्' : 'Listen | सुन्नुहोस्'}</span>
+                </button>
               </div>
             </div>
           ))}
@@ -231,9 +363,34 @@ How can I help you understand this topic better? Ask me anything about it!`,
         {/* Footer input form */}
         {/* प्रश्न सोध्ने input panel */}
         <form onSubmit={handleSendMessage} className="ai-drawer-footer">
+          {/* STT Microphone button */}
+          <button
+            type="button"
+            onClick={toggleListening}
+            className={`ai-drawer-mic-btn ${isListening ? 'listening' : ''}`}
+            disabled={isLoading}
+            style={{
+              background: isListening ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+              border: isListening ? '1px solid var(--error)' : '1px solid var(--glass-border)',
+              color: isListening ? 'var(--error)' : 'var(--text-secondary)',
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              flexShrink: 0,
+            }}
+            title={isListening ? 'Listening... click to stop' : 'Use voice input (STT)'}
+          >
+            {isListening ? <MicOff size={16} className="pulse-icon" /> : <Mic size={16} />}
+          </button>
+
           <input
             type="text"
-            placeholder="Ask AI Tutor (e.g. why is A correct?) | जिज्ञासा सोध्नुहोस्..."
+            placeholder={isListening ? "Listening... | सुन्दैछु..." : "Ask AI Tutor... | जिज्ञासा सोध्नुहोस्..."}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             disabled={isLoading}
