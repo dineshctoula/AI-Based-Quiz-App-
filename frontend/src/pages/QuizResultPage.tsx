@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Award, BookOpen, CheckCircle2, XCircle, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Award, BookOpen, CheckCircle2, XCircle, ArrowLeft, RefreshCw, MessageSquare } from 'lucide-react';
+import { AiTutorDrawer } from '../components/AiTutorDrawer';
 
 interface GradedAnswer {
   questionId: number;
@@ -14,6 +15,7 @@ interface GradedAnswer {
 
 interface Attempt {
   id: number;
+  quizId: number;
   score: number;
   completedAt: string;
   answers: GradedAnswer[];
@@ -30,6 +32,16 @@ export const QuizResultPage: React.FC = () => {
   // Retrieve attempt details passed via navigation state
   // navigation state बाट quiz attempt को details तान्ने
   const attempt = location.state?.attempt as Attempt | undefined;
+
+  // States for controlling the AI Tutor chat drawer
+  // AI Tutor च्याट panel नियन्त्रण गर्ने states हरू
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeQuestion, setActiveQuestion] = useState<GradedAnswer | null>(null);
+
+  const handleAskTutor = (answer: GradedAnswer) => {
+    setActiveQuestion(answer);
+    setDrawerOpen(true);
+  };
 
   // If no attempt data is present in route state, redirect to dashboard
   // state मा attempt details छैन भने direct dashboard मा पठाइदिने
@@ -197,6 +209,27 @@ export const QuizResultPage: React.FC = () => {
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
                 {answer.explanation || 'No explanation provided. | विश्लेषण उपलब्ध छैन।'}
               </p>
+
+              <button
+                onClick={() => handleAskTutor(answer)}
+                className="btn btn-secondary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.8rem',
+                  padding: '6px 12px',
+                  marginTop: '12px',
+                  border: '1px solid rgba(6, 182, 212, 0.4)',
+                  color: 'var(--secondary)',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer',
+                  background: 'rgba(6, 182, 212, 0.05)',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <MessageSquare size={14} /> Ask AI Tutor | थप स्पष्टीकरण सोध्नुहोस्
+              </button>
             </div>
           </div>
         ))}
@@ -208,6 +241,22 @@ export const QuizResultPage: React.FC = () => {
           Back to Dashboard
         </button>
       </div>
+
+      {/* AI Tutor chat sidebar drawer */}
+      {/* AI Tutor च्याट sidebar drawer */}
+      {activeQuestion && (
+        <AiTutorDrawer
+          isOpen={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          quizId={attempt.quizId}
+          questionId={activeQuestion.questionId}
+          questionText={activeQuestion.text}
+          options={activeQuestion.options}
+          correctAnswer={activeQuestion.correctAnswer}
+          selectedOption={activeQuestion.selectedOption}
+          originalExplanation={activeQuestion.explanation}
+        />
+      )}
     </div>
   );
 };
