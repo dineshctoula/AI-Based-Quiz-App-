@@ -2,6 +2,7 @@ import { Controller, Post, Get, Body, Param, UseGuards, ParseIntPipe } from '@ne
 import { QuizzesService } from './quizzes.service';
 import { GenerateQuizDto } from './dto/generate-quiz.dto';
 import { SubmitAttemptDto } from './dto/submit-attempt.dto';
+import { AskTutorDto } from './dto/ask-tutor.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -100,5 +101,20 @@ export class QuizzesController {
     @Body() dto: SubmitAttemptDto,
   ) {
     return this.quizzesService.submitAttempt(user.id, id, dto);
+  }
+
+  /**
+   * Endpoint to ask the AI Tutor follow-up questions about a specific quiz question.
+   * POST /api/quizzes/:id/tutor
+   * 
+   * AI Tutor लाई सोधिएको थप प्रश्नको जवाफ दिने endpoint.
+   */
+  @Post(':id/tutor')
+  async askTutor(
+    @CurrentUser() user: { id: number; email: string },
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AskTutorDto,
+  ) {
+    return this.quizzesService.askTutor(user.id, id, dto);
   }
 }

@@ -1,12 +1,17 @@
-import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { GenerateQuizDto } from './dto/generate-quiz.dto';
 import { SubmitAttemptDto } from './dto/submit-attempt.dto';
+import { AskTutorDto } from './dto/ask-tutor.dto';
 
 @Injectable()
 export class QuizzesService {
   private readonly logger = new Logger(QuizzesService.name);
+
+  // In-memory rate limiting map: userId -> { count: number; lastReset: number }
+  // user request rate limit गर्न in-memory structure
+  private readonly tutorRequestCounts = new Map<number, { count: number; lastReset: number }>();
 
   constructor(
     private prisma: PrismaService,
@@ -378,5 +383,105 @@ export class QuizzesService {
         'Failed to compile performance stats | Performance analytics तयार पार्दा समस्या आयो',
       );
     }
+  }
+
+  /**
+   * Delegates AI Tutor follow-up questions to AiService after applying rate limits.
+   * 
+   * AI Tutor को लागि request handle गर्छ, rate limiting check गर्छ र AiService लाई delegate गर्छ।
+   */
+  async askTutor(userId: number, quizId: number, dto: AskTutorDto) {
+    const { questionId, message, history } = dto;
+    this.logger.log(`User ${userId} asking tutor about question ${questionId} in quiz ${quizId}`);
+
+    // Rate limiting check: Limit to 15 requests per hour per user
+    // Rate limit check गर्ने: १ घण्टामा बढीमा १५ वटा प्रश्न
+    const now = Date.now();
+    const limit = 15;
+    const windowMs = 60 * 60 * 1000;
+
+    let userRecord = this.tutorRequestCounts.get(userId);
+    if (!userRecord) {
+      userRecord = { count: 0, lastReset: now };
+      this.tutorRequestCounts.set(userId, userRecord);
+    }
+
+    if (now - userRecord.lastReset > windowMs) {
+      userRecord.count = 0;
+      userRecord.lastReset = now;
+    }
+
+    if (userRecord.count >= limit) {
+      this.logger.warn(`User ${userId} exceeded rate limit for tutor`);
+      throw new HttpException(
+        'Rate limit exceeded. Max 15 queries per hour. | सीमा नाघ्यो। प्रति घण्टा बढीमा १५ वटा जिज्ञासा मात्र सोध्न सकिन्छ।',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    // Verify quiz and question existence
+    // Quiz र Question exist गर्छ कि गर्दैन र related छ कि छैन जाँच्ने
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      include: {
+        questions: {
+          where: { id: questionId },
+        },
+      },
+    });
+
+    if (!quiz) {
+      throw new NotFoundException(`Quiz with ID ${quizId} not found | Quiz भेटिएन`);
+    }
+
+    const question = quiz.questions[0];
+    if (!question) {
+      throw new NotFoundException(`Question with ID ${questionId} not found in quiz ${quizId} | यो प्रश्न भेटिएन`);
+    }
+
+    // Check if user has attempted this quiz before querying AI Tutor
+    // AI Tutor लाई प्रश्न सोध्नु अघि user ले यो quiz attempt गरेको हुनुपर्छ
+    const attempt = await this.prisma.attempt.findFirst({
+      where: {
+        userId,
+        quizId,
+      },
+    });
+
+    if (!attempt) {
+      throw new HttpException(
+        'You must attempt the quiz before asking the AI Tutor. | AI Tutor लाई सोध्नु अघि तपाईंले क्विजको प्रयास गरेको हुनुपर्छ।',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Extract selected answer from attempt's JSON answers structure
+    // attempt.answers has structure: [{ questionId, selectedOption, isCorrect, explanation, correctAnswer }]
+    const answersArray = attempt.answers as any[];
+    const userAnswer = answersArray.find((ans: any) => ans.questionId === questionId);
+    const selectedOption = userAnswer ? userAnswer.selectedOption : 'None';
+
+    const questionContext = {
+      text: question.text,
+      options: question.options,
+      correctAnswer: question.correctAnswer,
+      selectedOption,
+      originalExplanation: question.explanation || '',
+    };
+
+    // Increment request count
+    userRecord.count++;
+
+    // Format history structure for AiService
+    const formattedHistory = history.map((h) => ({
+      role: h.role,
+      text: h.text,
+    }));
+
+    const responseText = await this.aiService.askTutor(questionContext, message, formattedHistory);
+
+    return {
+      response: responseText,
+    };
   }
 }
