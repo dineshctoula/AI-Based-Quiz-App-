@@ -195,4 +195,134 @@ export class AiService {
 
     return mockQuestions;
   }
+
+  /**
+   * AI Tutor chat session to answer user follow-up questions about a specific quiz question.
+   * 
+   * AI Tutor सँग कुराकानी गरेर विद्यार्थीको थप जिज्ञासाको उत्तर दिने।
+   */
+  async askTutor(
+    questionContext: {
+      text: string;
+      options: string[];
+      correctAnswer: string;
+      selectedOption: string;
+      originalExplanation: string;
+    },
+    message: string,
+    history: { role: 'user' | 'model'; text: string }[],
+  ): Promise<string> {
+    const { text, options, correctAnswer, selectedOption, originalExplanation } = questionContext;
+
+    if (this.genAI) {
+      try {
+        this.logger.log(`Requesting AI Tutor explanation for question: "${text}"`);
+
+        const systemPrompt = `
+You are an expert AI Tutor helping a student understand a multiple-choice question from a quiz.
+Here is the context of the quiz question:
+- Question: "${text}"
+- Options: ${options.map((o, i) => `${String.fromCharCode(65 + i)}) ${o}`).join(', ')}
+- Correct Answer: "${correctAnswer}"
+- Student's Selected Answer: "${selectedOption || 'No answer selected'}"
+- Original Explanation: "${originalExplanation || 'No explanation available'}"
+
+Your goal is to answer the student's follow-up questions regarding this question. Be concise, encouraging, and clear.
+Explain the reasoning step-by-step. Keep your responses highly educational.
+If the student asks in Nepalese (नेपाली) or any other language, reply in that language. 
+Otherwise, write clearly and use formatting (bolding, lists, code blocks) to make your explanation readable.
+`;
+
+        const model = this.genAI.getGenerativeModel({
+          model: 'gemini-1.5-flash',
+          systemInstruction: systemPrompt,
+        });
+
+        // Format history for Gemini chat API
+        const geminiHistory = history.map((h) => ({
+          role: h.role,
+          parts: [{ text: h.text }],
+        }));
+
+        // Start chat session with history
+        const chat = model.startChat({
+          history: geminiHistory,
+        });
+
+        const result = await chat.sendMessage(message);
+        const responseText = result.response.text();
+        return responseText;
+      } catch (error) {
+        this.logger.error('AI Tutor chat failed. Falling back to Mock Tutor.', error);
+      }
+    }
+
+    // Fallback to mock tutor when Gemini is not initialized or fails
+    return this.generateMockTutorResponse(text, correctAnswer, selectedOption || 'None', message);
+  }
+
+  /**
+   * Helper to generate simulated AI Tutor responses when Gemini is disabled.
+   * 
+   * Gemini बन्द भएको बेला AI Tutor को कृत्रिम प्रतिक्रियाहरू तयार पार्ने helper.
+   */
+  private generateMockTutorResponse(
+    questionText: string,
+    correctAnswer: string,
+    selectedOption: string,
+    message: string,
+  ): string {
+    const isCorrect = correctAnswer.trim().toLowerCase() === selectedOption.trim().toLowerCase();
+    const lowerMessage = message.toLowerCase();
+
+    if (lowerMessage.includes('why') || lowerMessage.includes('explain') || lowerMessage.includes('किन') || lowerMessage.includes('किनभने')) {
+      return `### AI Tutor Explanation (Mock | नक्कली)
+
+Here is a detailed breakdown of the question: *"${questionText}"*
+
+1. **The Correct Answer**: **${correctAnswer}** is the correct choice because it represents the standard paradigm and meets all constraints of the problem.
+2. **Your Selection**: You chose **${selectedOption}**. ${
+        isCorrect 
+          ? 'This is absolutely correct! Excellent logical deduction.' 
+          : `This is incorrect. While it might seem plausible, it fails to account for core limitations or architecture guidelines.`
+      }
+3. **Core Concept**:
+   - Make sure to review the separation of concerns.
+   - Decouple modules to make them easily testable.
+
+*Note: This is a simulated response from the local mock tutor. Configure \`GEMINI_API_KEY\` to enable real AI responses.*`;
+    }
+
+    if (lowerMessage.includes('example') || lowerMessage.includes('उदाहरण')) {
+      return `### AI Tutor Example (Mock | नक्कली)
+
+Let's illustrate the concept behind the correct answer (**${correctAnswer}**) with an example:
+
+\`\`\`typescript
+// Good design: Modular and clean
+class UserConfig {
+  constructor(private readonly env: string) {}
+  
+  getDatabaseUrl() {
+    return this.env === 'production' 
+      ? 'postgresql://prod_db' 
+      : 'postgresql://dev_db';
+  }
 }
+\`\`\`
+
+Using this configuration approach avoids hardcoding credentials directly inside components. This explains why it is the correct choice compared to the alternative option: **${selectedOption}**.`;
+    }
+
+    return `### AI Tutor Response (Mock | नक्कली)
+
+I received your follow-up query: *"${message}"*
+
+Regarding the question: *"${questionText}"*
+- **Correct Answer**: \`${correctAnswer}\`
+- **Your Choice**: \`${selectedOption}\`
+
+Since there is no active Gemini API key configured in your environment, I am responding in mock mode. Please configure \`GEMINI_API_KEY\` in your \`.env\` file to receive real-time answers.`;
+  }
+}
+
