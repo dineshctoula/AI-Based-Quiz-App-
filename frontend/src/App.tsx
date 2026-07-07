@@ -7,7 +7,9 @@ import { GenerateQuizPage } from './pages/GenerateQuizPage';
 import { PlayQuizPage } from './pages/PlayQuizPage';
 import { QuizResultPage } from './pages/QuizResultPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
+import { MultiplayerPage } from './pages/MultiplayerPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SocketProvider } from './context/SocketContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import './App.css';
  
@@ -37,8 +39,8 @@ import './App.css';
                  Home
                </Link>
  
-               {/* Show Dashboard and Leaderboard links only if user is logged in */}
-               {/* user logged in छ भने मात्र Dashboard र Leaderboard links देखाउने */}
+               {/* Show Dashboard, Leaderboard, and Multiplayer links only if user is logged in */}
+               {/* user logged in छ भने मात्र Dashboard, Leaderboard र Multiplayer links देखाउने */}
                {user && (
                  <>
                    <Link to="/dashboard" className="nav-link">
@@ -46,6 +48,9 @@ import './App.css';
                    </Link>
                    <Link to="/leaderboard" className="nav-link">
                      Leaderboard
+                   </Link>
+                   <Link to="/multiplayer" className="nav-link">
+                     Multiplayer
                    </Link>
                  </>
                )}
@@ -133,6 +138,16 @@ import './App.css';
                  </ProtectedRoute>
                } 
              />
+
+             {/* Protected: Multiplayer Lobby page wrapped in ProtectedRoute */}
+             <Route 
+               path="/multiplayer" 
+               element={
+                 <ProtectedRoute>
+                   <MultiplayerPage />
+                 </ProtectedRoute>
+               } 
+             />
            </Routes>
          </main>
 
@@ -156,7 +171,9 @@ import './App.css';
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <AppContent />
+      <SocketProvider>
+        <AppContent />
+      </SocketProvider>
     </AuthProvider>
   );
 };
