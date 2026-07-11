@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
-import { Clock, ArrowLeft, ArrowRight, BrainCircuit, AlertTriangle, HelpCircle, ShieldAlert } from 'lucide-react';
+import { Clock, ArrowLeft, ArrowRight, BrainCircuit, AlertTriangle, HelpCircle, ShieldAlert, Users, Check } from 'lucide-react';
 
 // API base URL matching AuthContext
 const API_URL = 'http://localhost:5000/api';
@@ -25,7 +25,7 @@ interface Quiz {
 
 export const PlayQuizPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -242,7 +242,7 @@ export const PlayQuizPage: React.FC = () => {
       <div className="glow-ring glow-ring-right"></div>
 
       {/* Quiz Top status bar */}
-      <header className="play-quiz-header">
+      <header className="play-quiz-header" style={{ maxWidth: isMultiplayer ? '1100px' : '650px' }}>
         <div className="quiz-info-meta">
           <span className="quiz-badge difficulty-badge">{quiz.difficulty}</span>
           <span className="quiz-badge topic-badge">{quiz.topic}</span>
@@ -255,18 +255,63 @@ export const PlayQuizPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Main question taking layout */}
-      <div className="wizard-card-wrapper play-quiz-wrapper">
-        {isSubmitting && (
-          <div className="wizard-loading-overlay animate-fade-in">
-            <div className="loader-spinner-wrapper">
-              <div className="glowing-spinner"></div>
-              <Clock className="center-sparkle" size={24} />
+      {/* Grid structure if multiplayer */}
+      {/* यदि multiplayer हो भने HUD sidebar र main quiz section side-by-side राख्ने */}
+      <div className={isMultiplayer ? 'play-quiz-layout-container' : 'play-quiz-main-content'}>
+        
+        {isMultiplayer && (
+          <aside className="competitors-hud-sidebar animate-fade-in">
+            <h3>
+              <Users size={16} /> Competitors ({players.length})
+            </h3>
+            <div className="hud-players-list">
+              {players.map((player) => {
+                const isSelf = player.userId === user?.id;
+                return (
+                  <div 
+                    key={player.socketId} 
+                    className={`hud-player-item ${isSelf ? 'is-self' : ''}`}
+                  >
+                    <div className="hud-player-info">
+                      <div className="hud-player-avatar">
+                        {player.username.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="hud-player-name">
+                        {player.username} {isSelf && ' (You)'}
+                      </span>
+                    </div>
+
+                    <div className="hud-player-progress">
+                      {player.finished ? (
+                        <span className="hud-player-progress-badge hud-badge-finished">
+                          <Check size={12} /> Finished
+                        </span>
+                      ) : (
+                        <span className="hud-player-progress-badge hud-badge-playing">
+                          Q{((player.currentQuestionIndex ?? 0) + 1)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <h3>Grading Answers</h3>
-            <p className="step-message">Submitting responses to AI grading service... | उत्तरहरू जाँचिँदैछ...</p>
-          </div>
+          </aside>
         )}
+
+        <div className={isMultiplayer ? 'play-quiz-main-content' : ''}>
+          {/* Main question taking layout */}
+          <div className="wizard-card-wrapper play-quiz-wrapper" style={{ margin: isMultiplayer ? '0' : '0 auto', maxWidth: isMultiplayer ? '100%' : '650px' }}>
+            {isSubmitting && (
+              <div className="wizard-loading-overlay animate-fade-in">
+                <div className="loader-spinner-wrapper">
+                  <div className="glowing-spinner"></div>
+                  <Clock className="center-sparkle" size={24} />
+                </div>
+                <h3>Grading Answers</h3>
+                <p className="step-message">Submitting responses to AI grading service... | उत्तरहरू जाँचिँदैछ...</p>
+              </div>
+            )}
 
         <div className="play-quiz-card">
           {/* Progress bar */}
@@ -337,6 +382,8 @@ export const PlayQuizPage: React.FC = () => {
           </div>
         </div>
       </div>
+    </div>
+  </div>
 
       {/* Warning if exiting */}
       <div className="quit-warning-container">
