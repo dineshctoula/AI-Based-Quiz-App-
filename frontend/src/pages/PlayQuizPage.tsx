@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import { Clock, ArrowLeft, ArrowRight, BrainCircuit, AlertTriangle, HelpCircle, ShieldAlert } from 'lucide-react';
 
 // API base URL matching AuthContext
@@ -26,6 +27,24 @@ export const PlayQuizPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { token } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Parse query params for multiplayer configurations
+  // multiplayer query parameters (mode र room) parse गर्ने
+  const searchParams = new URLSearchParams(location.search);
+  const isMultiplayer = searchParams.get('mode') === 'multiplayer';
+  const roomCode = searchParams.get('room');
+
+  // Socket Context details
+  const {
+    roomDetails,
+    players,
+    messages,
+    sendMessage,
+    updateProgress,
+    playerFinished,
+    leaveRoom,
+  } = useSocket();
 
   // State variables
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -33,6 +52,8 @@ export const PlayQuizPage: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<{ [key: number]: string }>({});
+  const [battleFinished, setBattleFinished] = useState(false);
+  const [attemptResult, setAttemptResult] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -89,6 +110,15 @@ export const PlayQuizPage: React.FC = () => {
     return () => clearInterval(timer);
   }, [timeLeft, loading, quiz]);
 
+  // Synchronize player progress with the lobby socket in multiplayer mode
+  // multiplayer mode मा player को progress (हालको प्रश्न र उत्तर दिएको सङ्ख्या) sync गर्ने
+  useEffect(() => {
+    if (isMultiplayer && roomCode && quiz) {
+      const answeredCount = Object.keys(selectedAnswers).length;
+      updateProgress(roomCode, currentIdx, answeredCount);
+    }
+  }, [isMultiplayer, roomCode, quiz, currentIdx, selectedAnswers, updateProgress]);
+
   // Format time (seconds -> MM:SS)
   // सेकेन्डलाई मिनेट र सेकेन्डमा format गर्ने
   const formatTime = (seconds: number) => {
@@ -140,9 +170,18 @@ export const PlayQuizPage: React.FC = () => {
         throw new Error(attemptResult.message || 'Submission failed');
       }
 
-      // Redirect to QuizResultPage and pass attempt details via state
-      // Attempt result details सहित result page मा navigate गर्ने
-      navigate('/quiz/result', { state: { attempt: attemptResult } });
+      // If multiplayer, notify the lobby and show results in-page
+      // multiplayer भएमा socket लाई notify गर्ने र leaderboard देखाउने
+      if (isMultiplayer && roomCode) {
+        playerFinished(roomCode, attemptResult.score);
+        setAttemptResult(attemptResult);
+        setBattleFinished(true);
+        setIsSubmitting(false);
+      } else {
+        // Redirect to QuizResultPage and pass attempt details via state
+        // Attempt result details सहित result page मा navigate गर्ने
+        navigate('/quiz/result', { state: { attempt: attemptResult } });
+      }
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || 'Failed to submit quiz | क्विज बुझाउन असफल भइयो');
@@ -304,6 +343,9 @@ export const PlayQuizPage: React.FC = () => {
         <button
           onClick={() => {
             if (window.confirm("Are you sure you want to quit? Progress will be lost. | के तपाईं बाहिरिन चाहनुहुन्छ? हालसम्मको progress हराउनेछ।")) {
+              if (isMultiplayer) {
+                leaveRoom();
+              }
               navigate('/dashboard');
             }
           }}
