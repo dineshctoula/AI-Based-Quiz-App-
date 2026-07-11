@@ -24,6 +24,10 @@ interface Player {
   userId: number;
   username: string;
   isHost: boolean;
+  currentQuestionIndex?: number; // 0-indexed current question index | हालको प्रश्नको index
+  scoreSoFar?: number;           // cumulative score earned | हालसम्मको score
+  finished?: boolean;            // whether quiz completed | खेल पुरा भएको छ वा छैन
+  finalScore?: number;           // final score after submitting | अन्तिम score
 }
 
 /**
@@ -181,6 +185,10 @@ export class QuizzesBattleGateway
             userId: user.id,
             username: user.name,
             isHost: true,
+            currentQuestionIndex: 0,
+            scoreSoFar: 0,
+            finished: false,
+            finalScore: 0,
           },
         ],
         messages: [],
@@ -241,6 +249,10 @@ export class QuizzesBattleGateway
         userId: user.id,
         username: user.name,
         isHost: false,
+        currentQuestionIndex: 0,
+        scoreSoFar: 0,
+        finished: false,
+        finalScore: 0,
       });
     } else {
       // Update socket ID if user reconnected or joined from another window
@@ -339,6 +351,75 @@ export class QuizzesBattleGateway
     });
 
     this.logger.log(`Battle started for room ${code} on quiz ID ${room.quizId}`);
+  }
+
+  /**
+   * Socket event to update the player's progress during the quiz.
+   * 
+   * खेल अवधिमा player को progress (कुन प्रश्नमा छ र कति score छ) update गर्ने event।
+   */
+  @SubscribeMessage('update_progress')
+  handleUpdateProgress(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { roomCode: string; currentQuestionIndex: number; scoreSoFar: number },
+  ) {
+    const user = client.data.user;
+    if (!user) return;
+
+    const code = data.roomCode?.toUpperCase();
+    const room = this.rooms.get(code);
+    if (!room) return;
+
+    const player = room.players.find((p) => p.userId === user.id);
+    if (player) {
+      player.currentQuestionIndex = data.currentQuestionIndex;
+      player.scoreSoFar = data.scoreSoFar;
+      
+      this.logger.log(`Room ${code}: Player ${user.name} progressed to Q${data.currentQuestionIndex + 1} with score ${data.scoreSoFar}`);
+      
+      // Broadcast updated room state to all players
+      // update भएको room status सबै participants लाई पठाउने
+      this.server.to(`room_${code}`).emit('room_update', room);
+    }
+  }
+
+  /**
+   * Socket event to submit the final score when a player completes the quiz.
+   * 
+   * player ले quiz सकेपछि score submit गर्ने र status finished बनाउने event।
+   */
+  @SubscribeMessage('player_finished')
+  handlePlayerFinished(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { roomCode: string; finalScore: number },
+  ) {
+    const user = client.data.user;
+    if (!user) return;
+
+    const code = data.roomCode?.toUpperCase();
+    const room = this.rooms.get(code);
+    if (!room) return;
+
+    const player = room.players.find((p) => p.userId === user.id);
+    if (player) {
+      player.finished = true;
+      player.finalScore = data.finalScore;
+      
+      this.logger.log(`Room ${code}: Player ${user.name} finished the quiz with final score ${data.finalScore}`);
+      
+      // Add system message about completion
+      // system message chat मा थप्ने
+      room.messages.push({
+        sender: 'SYSTEM',
+        text: `${user.name} has completed the quiz! Score: ${data.finalScore} | ${user.name} ले क्विज पूरा गर्यो! प्राप्त स्कोर: ${data.finalScore}`,
+        timestamp: new Date(),
+      });
+
+      // Broadcast updated room state and the new message
+      // update भएको room details र notification message अरू player लाई पठाउने
+      this.server.to(`room_${code}`).emit('room_update', room);
+      this.server.to(`room_${code}`).emit('new_message', room.messages[room.messages.length - 1]);
+    }
   }
 
   /**
