@@ -56,6 +56,23 @@ export const PlayQuizPage: React.FC = () => {
   const [attemptResult, setAttemptResult] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to bottom of chat list whenever a new message arrives
+  // नयाँ message आउँदा chat box scroll bottom गराउने
+  useEffect(() => {
+    if (battleFinished) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, battleFinished]);
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    sendMessage(chatInput.trim());
+    setChatInput('');
+  };
 
   // Ref to hold the submitting state to prevent double submission
   const isSubmittingRef = useRef(false);
@@ -189,6 +206,183 @@ export const PlayQuizPage: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  if (battleFinished) {
+    // Sort players by finished status and score
+    // player हरूको status र score अनुसार rank sort गर्ने
+    const sortedPlayers = [...players].sort((a, b) => {
+      const scoreA = a.finished ? (a.finalScore ?? 0) : (a.scoreSoFar ?? 0);
+      const scoreB = b.finished ? (b.finalScore ?? 0) : (b.scoreSoFar ?? 0);
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      if (a.finished !== b.finished) return a.finished ? -1 : 1;
+      return a.username.localeCompare(b.username);
+    });
+
+    return (
+      <div className="wizard-page-container">
+        {/* Background glowing rings */}
+        <div className="glow-ring glow-ring-left"></div>
+        <div className="glow-ring glow-ring-right"></div>
+
+        <div className="wizard-card-wrapper play-quiz-wrapper battle-standings-card animate-scale-up" style={{ maxWidth: '950px' }}>
+          <div className="battle-results-header">
+            <span className="quiz-badge difficulty-badge" style={{ marginBottom: '8px' }}>Battle Results</span>
+            <h2>{quiz?.title}</h2>
+            <p>Room Code: <strong>{roomCode}</strong> | खेल सकियो! नतिजा र र्याङ्किङ हेर्नुहोस्।</p>
+          </div>
+
+          <div className="battle-results-grid">
+            {/* Left side: Rankings / Podium */}
+            <div className="rankings-section">
+              {/* Podium for top 3 */}
+              <div className="podium-container">
+                {/* 2nd Place */}
+                {sortedPlayers[1] && (
+                  <div className="podium-column podium-second">
+                    <div className="podium-avatar">
+                      {sortedPlayers[1].username.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="podium-step">
+                      <span className="podium-rank-text">2nd</span>
+                      <span className="podium-name">{sortedPlayers[1].username}</span>
+                      <span className="podium-score">
+                        {sortedPlayers[1].finished ? `${sortedPlayers[1].finalScore} pts` : 'Playing...'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 1st Place */}
+                {sortedPlayers[0] && (
+                  <div className="podium-column podium-first">
+                    <span className="podium-crown">👑</span>
+                    <div className="podium-avatar">
+                      {sortedPlayers[0].username.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="podium-step">
+                      <span className="podium-rank-text">1st</span>
+                      <span className="podium-name">{sortedPlayers[0].username}</span>
+                      <span className="podium-score">
+                        {sortedPlayers[0].finished ? `${sortedPlayers[0].finalScore} pts` : 'Playing...'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3rd Place */}
+                {sortedPlayers[2] && (
+                  <div className="podium-column podium-third">
+                    <div className="podium-avatar">
+                      {sortedPlayers[2].username.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="podium-step">
+                      <span className="podium-rank-text">3rd</span>
+                      <span className="podium-name">{sortedPlayers[2].username}</span>
+                      <span className="podium-score">
+                        {sortedPlayers[2].finished ? `${sortedPlayers[2].finalScore} pts` : 'Playing...'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Standings list for all players */}
+              <div className="standings-list">
+                {sortedPlayers.map((player, index) => (
+                  <div key={player.socketId} className="standings-item">
+                    <div className="standings-player-meta">
+                      <span className="standings-rank">#{index + 1}</span>
+                      <span className="standings-player-name">
+                        {player.username} {player.userId === user?.id && ' (You)'}
+                      </span>
+                    </div>
+                    <div className="standings-score-details">
+                      <span className="standings-score">
+                        {player.finished ? player.finalScore : player.scoreSoFar} pts
+                      </span>
+                      <span className={`standings-status-tag ${player.finished ? 'completed' : 'playing'}`}>
+                        {player.finished ? 'Completed' : 'Playing'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '16px', marginTop: '20px' }}>
+                <button
+                  onClick={() => {
+                    leaveRoom();
+                    navigate('/dashboard');
+                  }}
+                  className="btn btn-secondary"
+                  style={{ flex: 1 }}
+                >
+                  Back to Dashboard
+                </button>
+                {attemptResult && (
+                  <button
+                    onClick={() => {
+                      navigate('/quiz/result', { state: { attempt: attemptResult } });
+                    }}
+                    className="btn btn-primary"
+                    style={{ flex: 1 }}
+                  >
+                    View Detail Review
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Right side: Chat */}
+            <div className="wizard-card-wrapper chat-card" style={{ padding: '20px', minHeight: '350px', display: 'flex', flexDirection: 'column', background: 'rgba(15, 23, 42, 0.4)' }}>
+              <h3 style={{ margin: '0 0 12px 0', fontFamily: 'var(--font-heading)', fontSize: '1rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '8px' }}>
+                Battle Chat
+              </h3>
+              
+              <div className="chat-messages-container" style={{ flex: 1, overflowY: 'auto', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px' }}>
+                {messages.length === 0 ? (
+                  <div className="chat-empty-state" style={{ margin: 'auto', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    No messages yet. Send a message to start!
+                  </div>
+                ) : (
+                  messages.map((msg, idx) => {
+                    const isSystem = msg.sender === 'SYSTEM';
+                    const isSelf = msg.sender === user?.name;
+                    return (
+                      <div
+                        key={idx}
+                        className={`chat-bubble-row ${isSystem ? 'system-row' : isSelf ? 'self-row' : 'other-row'}`}
+                      >
+                        {!isSystem && <span className="chat-sender">{msg.sender}</span>}
+                        <div className="chat-bubble">
+                          <p>{msg.text}</p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              <form onSubmit={handleSendMessage} className="chat-input-form" style={{ display: 'flex', gap: '10px' }}>
+                <input
+                  type="text"
+                  placeholder="Type a message... | सन्देश लेख्नुहोस्..."
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  className="chat-input-field"
+                  style={{ flex: 1 }}
+                />
+                <button type="submit" className="btn btn-primary" style={{ padding: '10px 16px' }} disabled={!chatInput.trim()}>
+                  Send
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
