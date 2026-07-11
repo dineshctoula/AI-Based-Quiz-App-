@@ -12,6 +12,10 @@ interface Player {
   userId: number;
   username: string;
   isHost: boolean;
+  currentQuestionIndex?: number; // 0-indexed current question index | हालको प्रश्नको index
+  scoreSoFar?: number;           // cumulative score earned | हालसम्मको score
+  finished?: boolean;            // whether quiz completed | खेल पुरा भएको छ वा छैन
+  finalScore?: number;           // final score after submitting | अन्तिम score
 }
 
 /**
@@ -61,6 +65,8 @@ interface SocketContextType {
   leaveRoom: () => void;
   startBattle: () => void;
   clearError: () => void;
+  updateProgress: (roomCode: string, currentQuestionIndex: number, scoreSoFar: number) => void;
+  playerFinished: (roomCode: string, finalScore: number) => void;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -213,6 +219,22 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  // Update current question progress and score during battle
+  // battle अवधिमा player को question progress र score update गर्ने
+  const updateProgress = (code: string, currentQuestionIndex: number, scoreSoFar: number) => {
+    if (socket && isConnected) {
+      socket.emit('update_progress', { roomCode: code, currentQuestionIndex, scoreSoFar });
+    }
+  };
+
+  // Submit final score when completing the quiz
+  // quiz सकेपछि final score submit गर्ने
+  const playerFinished = (code: string, finalScore: number) => {
+    if (socket && isConnected) {
+      socket.emit('player_finished', { roomCode: code, finalScore });
+    }
+  };
+
   const clearError = () => setError(null);
 
   return (
@@ -233,6 +255,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         leaveRoom,
         startBattle,
         clearError,
+        updateProgress,
+        playerFinished,
       }}
     >
       {children}
