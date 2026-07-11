@@ -37,7 +37,6 @@ export const PlayQuizPage: React.FC = () => {
 
   // Socket Context details
   const {
-    roomDetails,
     players,
     messages,
     sendMessage,
