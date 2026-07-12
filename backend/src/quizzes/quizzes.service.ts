@@ -484,4 +484,199 @@ export class QuizzesService {
       response: responseText,
     };
   }
+
+  /**
+   * Submits a report/flag on a quiz.
+   * 
+   * क्विजमा रिपोर्ट/फ्ल्याग दर्ता गर्छ।
+   */
+  async flagQuiz(userId: number, quizId: number, reason: string, comment?: string) {
+    this.logger.log(`User ${userId} flagging quiz ${quizId} for reason: ${reason}`);
+    
+    const quizExists = await this.prisma.quiz.findUnique({
+      where: { id: quizId }
+    });
+    if (!quizExists) {
+      throw new NotFoundException(`Quiz with ID ${quizId} not found | ID ${quizId} भएको क्विज भेटिएन`);
+    }
+
+    return this.prisma.flag.create({
+      data: {
+        userId,
+        quizId,
+        reason,
+        comment
+      }
+    });
+  }
+
+  /**
+   * Retrieves system-wide stats for admin dashboard.
+   * 
+   * Admin dashboard को लागि सम्पूर्ण प्रणालीको तथ्याङ्क तान्छ।
+   */
+  async getAdminStats() {
+    this.logger.log('Fetching system-wide admin stats');
+    try {
+      const totalUsers = await this.prisma.user.count();
+      const totalQuizzes = await this.prisma.quiz.count();
+      const totalAttempts = await this.prisma.attempt.count();
+      const totalFlags = await this.prisma.flag.count({ where: { resolved: false } });
+
+      const attempts = await this.prisma.attempt.findMany({
+        select: { score: true }
+      });
+      const avgScore = attempts.length > 0 
+        ? Math.round(attempts.reduce((sum, a) => sum + a.score, 0) / attempts.length)
+        : 0;
+
+      // Group attempts by topic to find popular topics
+      const quizzes = await this.prisma.quiz.findMany({
+        select: { topic: true }
+      });
+      const topicCounts: Record<string, number> = {};
+      quizzes.forEach(q => {
+        topicCounts[q.topic] = (topicCounts[q.topic] || 0) + 1;
+      });
+      const popularTopics = Object.keys(topicCounts).map(topic => ({
+        topic,
+        count: topicCounts[topic]
+      })).sort((a, b) => b.count - a.count).slice(0, 5);
+
+      return {
+        totalUsers,
+        totalQuizzes,
+        totalAttempts,
+        totalFlags,
+        avgScore,
+        popularTopics
+      };
+    } catch (error) {
+      this.logger.error('Failed to fetch admin stats', error);
+      throw new InternalServerErrorException('Failed to load admin statistics | एडमिन तथ्याङ्क तान्न असफल भयो');
+    }
+  }
+
+  /**
+   * Retrieves all users for admin management.
+   * 
+   * Admin को लागि सबै प्रयोगकर्ताको विवरण तान्छ।
+   */
+  async getAdminUsers() {
+    this.logger.log('Fetching all users for admin');
+    return this.prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+        _count: {
+          select: {
+            attempts: true,
+            quizzes: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+  }
+
+  /**
+   * Updates a user's role.
+   * 
+   * प्रयोगकर्ताको भूमिका (role) परिवर्तन गर्छ।
+   */
+  async updateUserRole(userId: number, role: string) {
+    this.logger.log(`Updating role of user ${userId} to ${role}`);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found | ID ${userId} भएको प्रयोगकर्ता भेटिएन`);
+    }
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { role }
+    });
+  }
+
+  /**
+   * Deletes a user.
+   * 
+   * प्रयोगकर्तालाई हटाउँछ।
+   */
+  async deleteUser(userId: number) {
+    this.logger.log(`Deleting user ${userId}`);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found | ID ${userId} भएको प्रयोगकर्ता भेटिएन`);
+    }
+    return this.prisma.user.delete({
+      where: { id: userId }
+    });
+  }
+
+  /**
+   * Retrieves all active (unresolved) flags.
+   * 
+   * समाधान नभएका (unresolved) सबै फ्ल्याग रिपोर्टहरू तान्छ।
+   */
+  async getAdminFlags() {
+    this.logger.log('Fetching all quiz flags for admin');
+    return this.prisma.flag.findMany({
+      where: { resolved: false },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        quiz: {
+          include: {
+            questions: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+  }
+
+  /**
+   * Resolves/dismisses a flag.
+   * 
+   * फ्ल्याग रिपोर्टलाई समाधान भएको जनाउँछ।
+   */
+  async resolveFlag(flagId: number) {
+    this.logger.log(`Resolving flag ${flagId}`);
+    const flag = await this.prisma.flag.findUnique({ where: { id: flagId } });
+    if (!flag) {
+      throw new NotFoundException(`Flag with ID ${flagId} not found | ID ${flagId} भएको फ्ल्याग भेटिएन`);
+    }
+    return this.prisma.flag.update({
+      where: { id: flagId },
+      data: { resolved: true }
+    });
+  }
+
+  /**
+   * Deletes a quiz.
+   * 
+   * क्विजलाई हटाउँछ।
+   */
+  async deleteQuiz(quizId: number) {
+    this.logger.log(`Deleting quiz ${quizId}`);
+    const quiz = await this.prisma.quiz.findUnique({ where: { id: quizId } });
+    if (!quiz) {
+      throw new NotFoundException(`Quiz with ID ${quizId} not found | ID ${quizId} भएको क्विज भेटिएन`);
+    }
+    return this.prisma.quiz.delete({
+      where: { id: quizId }
+    });
+  }
 }
+

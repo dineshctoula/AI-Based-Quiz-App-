@@ -1,9 +1,11 @@
-import { Controller, Post, Get, Body, Param, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { QuizzesService } from './quizzes.service';
 import { GenerateQuizDto } from './dto/generate-quiz.dto';
 import { SubmitAttemptDto } from './dto/submit-attempt.dto';
 import { AskTutorDto } from './dto/ask-tutor.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 /**
@@ -78,6 +80,100 @@ export class QuizzesController {
   }
 
   /**
+   * Endpoint to retrieve system-wide stats for admin.
+   * GET /api/quizzes/admin/stats
+   * 
+   * एडमिनको लागि सम्पूर्ण प्रणालीको तथ्याङ्क तान्ने endpoint.
+   */
+  @Get('admin/stats')
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
+  async getAdminStats() {
+    return this.quizzesService.getAdminStats();
+  }
+
+  /**
+   * Endpoint to retrieve all users for admin management.
+   * GET /api/quizzes/admin/users
+   * 
+   * एडमिनको लागि सबै प्रयोगकर्ताको विवरण तान्ने endpoint.
+   */
+  @Get('admin/users')
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
+  async getAdminUsers() {
+    return this.quizzesService.getAdminUsers();
+  }
+
+  /**
+   * Endpoint to update a user's role.
+   * PATCH /api/quizzes/admin/users/:id/role
+   * 
+   * प्रयोगकर्ताको भूमिका परिवर्तन गर्ने endpoint.
+   */
+  @Patch('admin/users/:id/role')
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
+  async updateUserRole(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('role') role: string,
+  ) {
+    return this.quizzesService.updateUserRole(id, role);
+  }
+
+  /**
+   * Endpoint to delete a user.
+   * DELETE /api/quizzes/admin/users/:id
+   * 
+   * प्रयोगकर्ता हटाउने endpoint.
+   */
+  @Delete('admin/users/:id')
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
+  async deleteUser(@Param('id', ParseIntPipe) id: number) {
+    return this.quizzesService.deleteUser(id);
+  }
+
+  /**
+   * Endpoint to retrieve all reports/flags for admin.
+   * GET /api/quizzes/admin/flags
+   * 
+   * एडमिनको लागि फ्ल्याग रिपोर्टहरू तान्ने endpoint.
+   */
+  @Get('admin/flags')
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
+  async getAdminFlags() {
+    return this.quizzesService.getAdminFlags();
+  }
+
+  /**
+   * Endpoint to resolve a flag.
+   * PATCH /api/quizzes/admin/flags/:id/resolve
+   * 
+   * फ्ल्याग रिपोर्ट समाधान भएको जनाउने endpoint.
+   */
+  @Patch('admin/flags/:id/resolve')
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
+  async resolveFlag(@Param('id', ParseIntPipe) id: number) {
+    return this.quizzesService.resolveFlag(id);
+  }
+
+  /**
+   * Endpoint to delete a quiz.
+   * DELETE /api/quizzes/admin/quizzes/:id
+   * 
+   * क्विज हटाउने endpoint.
+   */
+  @Delete('admin/quizzes/:id')
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
+  async deleteQuiz(@Param('id', ParseIntPipe) id: number) {
+    return this.quizzesService.deleteQuiz(id);
+  }
+
+  /**
    * Endpoint to retrieve a specific quiz details (sanitized questions).
    * GET /api/quizzes/:id
    * 
@@ -116,5 +212,21 @@ export class QuizzesController {
     @Body() dto: AskTutorDto,
   ) {
     return this.quizzesService.askTutor(user.id, id, dto);
+  }
+
+  /**
+   * Endpoint to report/flag a quiz.
+   * POST /api/quizzes/:id/flag
+   * 
+   * प्रयोगकर्ताले क्विजमा फ्ल्याग/रिपोर्ट दर्ता गर्ने endpoint.
+   */
+  @Post(':id/flag')
+  async flagQuiz(
+    @CurrentUser() user: { id: number; email: string },
+    @Param('id', ParseIntPipe) id: number,
+    @Body('reason') reason: string,
+    @Body('comment') comment?: string,
+  ) {
+    return this.quizzesService.flagQuiz(user.id, id, reason, comment);
   }
 }
