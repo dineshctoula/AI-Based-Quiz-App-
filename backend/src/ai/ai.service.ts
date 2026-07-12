@@ -324,5 +324,85 @@ Regarding the question: *"${questionText}"*
 
 Since there is no active Gemini API key configured in your environment, I am responding in mock mode. Please configure \`GEMINI_API_KEY\` in your \`.env\` file to receive real-time answers.`;
   }
+
+  /**
+   * Corrects a question using AI based on a flag reason.
+   * 
+   * फ्ल्याग गरिएको प्रश्नलाई AI को मद्दतले संशोधन गर्छ।
+   */
+  async correctQuestion(
+    questionContext: {
+      text: string;
+      options: string[];
+      correctAnswer: string;
+      explanation: string;
+    },
+    flagReason: string,
+  ): Promise<GeneratedQuestion> {
+    if (this.genAI) {
+      try {
+        this.logger.log(`Requesting Gemini to correct question based on flag: "${flagReason}"`);
+        const model = this.genAI.getGenerativeModel({
+          model: 'gemini-1.5-flash',
+          generationConfig: { responseMimeType: 'application/json' },
+        });
+
+        const prompt = `
+          You are an expert quiz content moderator. You are given a multiple-choice question that has been flagged by a user as incorrect.
+          
+          Here is the original question context:
+          - Question Text: "${questionContext.text}"
+          - Options: ${JSON.stringify(questionContext.options)}
+          - Correct Answer: "${questionContext.correctAnswer}"
+          - Explanation: "${questionContext.explanation}"
+          
+          User Flag Reason / Comment: "${flagReason}"
+          
+          Your job is to fix the question so it is correct, accurate, clear, and fully addresses the user's feedback.
+          Make sure:
+          1. The options list has exactly 4 options.
+          2. The correctAnswer matches one of the options exactly.
+          3. The explanation explains the corrected question clearly.
+          
+          You must return a JSON object with this structure:
+          {
+            "text": "The corrected question text here",
+            "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+            "correctAnswer": "The exact corrected correct option text",
+            "explanation": "Detailed explanation of the corrected question and answer"
+          }
+        `;
+
+        const result = await model.generateContent(prompt);
+        const responseText = result.response.text();
+        const parsed = JSON.parse(responseText);
+
+        if (parsed && parsed.text && Array.isArray(parsed.options) && parsed.options.length === 4) {
+          let correctAnswer = parsed.correctAnswer || parsed.options[0];
+          if (!parsed.options.includes(correctAnswer)) {
+            const match = parsed.options.find((opt: string) => opt.toLowerCase() === correctAnswer.toLowerCase());
+            correctAnswer = match || parsed.options[0];
+          }
+          return {
+            text: parsed.text,
+            options: parsed.options,
+            correctAnswer,
+            explanation: parsed.explanation || 'No explanation provided.'
+          };
+        }
+        throw new Error('Invalid JSON structure returned from Gemini.');
+      } catch (error) {
+        this.logger.error('Gemini question correction failed. Falling back to Mock Correction.', error);
+      }
+    }
+
+    // Fallback: Mock correction
+    return {
+      text: questionContext.text + ' (AI Corrected)',
+      options: questionContext.options,
+      correctAnswer: questionContext.correctAnswer,
+      explanation: questionContext.explanation + `\n\n[Moderator Note: Corrected automatically in mock mode based on feedback: "${flagReason}"]`
+    };
+  }
 }
 

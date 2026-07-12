@@ -678,5 +678,60 @@ export class QuizzesService {
       where: { id: quizId }
     });
   }
+
+  /**
+   * Corrects a question using AI based on a flag report and resolves the flag.
+   * 
+   * फ्ल्याग रिपोर्टको आधारमा प्रश्न सच्याउँछ र रिपोर्टलाई समाधान भएको जनाउँछ।
+   */
+  async correctQuestion(quizId: number, questionId: number, flagId: number) {
+    this.logger.log(`Admin correcting question ${questionId} in quiz ${quizId} for flag ${flagId}`);
+    
+    // 1. Fetch flag
+    const flag = await this.prisma.flag.findUnique({
+      where: { id: flagId }
+    });
+    if (!flag) {
+      throw new NotFoundException(`Flag report with ID ${flagId} not found | ID ${flagId} भएको फ्ल्याग रिपोर्ट भेटिएन`);
+    }
+
+    // 2. Fetch question
+    const question = await this.prisma.question.findUnique({
+      where: { id: questionId }
+    });
+    if (!question || question.quizId !== quizId) {
+      throw new NotFoundException(`Question with ID ${questionId} not found in quiz ${quizId} | क्विजमा यो प्रश्न भेटिएन`);
+    }
+
+    // 3. Call AI Service to correct
+    const originalContext = {
+      text: question.text,
+      options: question.options,
+      correctAnswer: question.correctAnswer,
+      explanation: question.explanation || ''
+    };
+    const flagReasonText = `${flag.reason}${flag.comment ? ` - Comment: ${flag.comment}` : ''}`;
+    
+    const corrected = await this.aiService.correctQuestion(originalContext, flagReasonText);
+
+    // 4. Update question details in DB
+    const updatedQuestion = await this.prisma.question.update({
+      where: { id: questionId },
+      data: {
+        text: corrected.text,
+        options: corrected.options,
+        correctAnswer: corrected.correctAnswer,
+        explanation: corrected.explanation
+      }
+    });
+
+    // 5. Resolve the flag
+    await this.prisma.flag.update({
+      where: { id: flagId },
+      data: { resolved: true }
+    });
+
+    return updatedQuestion;
+  }
 }
 

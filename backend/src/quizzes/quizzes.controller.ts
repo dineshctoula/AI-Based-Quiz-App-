@@ -174,6 +174,24 @@ export class QuizzesController {
   }
 
   /**
+   * Endpoint to correct a flagged question using AI.
+   * POST /api/quizzes/admin/quizzes/:quizId/correct-question/:questionId
+   * 
+   * फ्ल्याग गरिएको प्रश्नलाई AI द्वारा संशोधन गर्ने endpoint.
+   */
+  @Post('admin/quizzes/:quizId/correct-question/:questionId')
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
+  async correctQuestion(
+    @Param('quizId', ParseIntPipe) quizId: number,
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Body('flagId', ParseIntPipe) flagId: number,
+  ) {
+    return this.quizzesService.correctQuestion(quizId, questionId, flagId);
+  }
+
+
+  /**
    * Endpoint to retrieve a specific quiz details (sanitized questions).
    * GET /api/quizzes/:id
    * 
