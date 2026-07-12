@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Award, BookOpen, CheckCircle2, XCircle, ArrowLeft, RefreshCw, MessageSquare } from 'lucide-react';
+import { Award, BookOpen, CheckCircle2, XCircle, ArrowLeft, RefreshCw, MessageSquare, AlertTriangle } from 'lucide-react';
 import { AiTutorDrawer } from '../components/AiTutorDrawer';
+
+const API_URL = 'http://localhost:5000/api';
 
 interface GradedAnswer {
   questionId: number;
@@ -38,9 +40,62 @@ export const QuizResultPage: React.FC = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeQuestion, setActiveQuestion] = useState<GradedAnswer | null>(null);
 
+  // States for controlling Flag/Report Modal
+  // रिपोर्ट/फ्ल्याग मोडेल नियन्त्रण गर्ने states हरू
+  const [flagModalOpen, setFlagModalOpen] = useState(false);
+  const [flaggingQuestionId, setFlaggingQuestionId] = useState<number | null>(null);
+  const [flagReason, setFlagReason] = useState('incorrect_answer');
+  const [flagComment, setFlagComment] = useState('');
+  const [flagSuccess, setFlagSuccess] = useState(false);
+  const [flagLoading, setFlagLoading] = useState(false);
+
   const handleAskTutor = (answer: GradedAnswer) => {
     setActiveQuestion(answer);
     setDrawerOpen(true);
+  };
+
+  const handleOpenFlagModal = (questionId: number) => {
+    setFlaggingQuestionId(questionId);
+    setFlagReason('incorrect_answer');
+    setFlagComment('');
+    setFlagSuccess(false);
+    setFlagModalOpen(true);
+  };
+
+  const handleSubmitFlag = async () => {
+    if (!flaggingQuestionId || !attempt) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    setFlagLoading(true);
+    try {
+      // Find the targeted question details
+      const q = attempt.answers.find(ans => ans.questionId === flaggingQuestionId);
+      const questionSnippet = q ? `[Question: "${q.text}"]` : '';
+      
+      const res = await fetch(`${API_URL}/quizzes/${attempt.quizId}/flag`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reason: flagReason,
+          comment: `Question ID: ${flaggingQuestionId} ${questionSnippet} - User Comment: ${flagComment}`,
+        }),
+      });
+
+      if (res.ok) {
+        setFlagSuccess(true);
+        setTimeout(() => {
+          setFlagModalOpen(false);
+        }, 1500);
+      }
+    } catch (err) {
+      console.error('Failed to submit flag:', err);
+    } finally {
+      setFlagLoading(false);
+    }
   };
 
   // If no attempt data is present in route state, redirect to dashboard
@@ -210,26 +265,49 @@ export const QuizResultPage: React.FC = () => {
                 {answer.explanation || 'No explanation provided. | विश्लेषण उपलब्ध छैन।'}
               </p>
 
-              <button
-                onClick={() => handleAskTutor(answer)}
-                className="btn btn-secondary"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '0.8rem',
-                  padding: '6px 12px',
-                  marginTop: '12px',
-                  border: '1px solid rgba(6, 182, 212, 0.4)',
-                  color: 'var(--secondary)',
-                  borderRadius: 'var(--radius-sm)',
-                  cursor: 'pointer',
-                  background: 'rgba(6, 182, 212, 0.05)',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                <MessageSquare size={14} /> Ask AI Tutor | थप स्पष्टीकरण सोध्नुहोस्
-              </button>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => handleAskTutor(answer)}
+                  className="btn btn-secondary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.8rem',
+                    padding: '6px 12px',
+                    marginTop: '12px',
+                    border: '1px solid rgba(6, 182, 212, 0.4)',
+                    color: 'var(--secondary)',
+                    borderRadius: 'var(--radius-sm)',
+                    cursor: 'pointer',
+                    background: 'rgba(6, 182, 212, 0.05)',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <MessageSquare size={14} /> Ask AI Tutor | थप स्पष्टीकरण सोध्नुहोस्
+                </button>
+
+                <button
+                  onClick={() => handleOpenFlagModal(answer.questionId)}
+                  className="btn btn-secondary animate-pulse"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.8rem',
+                    padding: '6px 12px',
+                    marginTop: '12px',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    color: '#ef4444',
+                    borderRadius: 'var(--radius-sm)',
+                    cursor: 'pointer',
+                    background: 'rgba(239, 68, 68, 0.05)',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <AlertTriangle size={14} /> Report Content | त्रुटि सच्याउन रिपोर्ट गर्नुहोस्
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -256,6 +334,98 @@ export const QuizResultPage: React.FC = () => {
           selectedOption={activeQuestion.selectedOption}
           originalExplanation={activeQuestion.explanation}
         />
+      )}
+
+      {/* Flag Report Modal */}
+      {/* रिपोर्ट दर्ता गर्ने मोडेल */}
+      {flagModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(7, 9, 19, 0.85)', zIndex: 1100, display: 'flex',
+          alignItems: 'center', justifyContent: 'center', padding: '20px',
+          backdropFilter: 'blur(8px)'
+        }}>
+          <div className="glass-card p-4 animate-scale-up" style={{ maxWidth: '450px', width: '100%', position: 'relative' }}>
+            <button 
+              onClick={() => setFlagModalOpen(false)}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+            >
+              <XCircle size={20} />
+            </button>
+
+            {flagSuccess ? (
+              <div className="text-center py-4">
+                <CheckCircle2 className="text-success mb-3" size={56} style={{ margin: '0 auto' }} />
+                <h4 className="gradient-text">Report Submitted!</h4>
+                <p className="text-secondary small mb-0">
+                  Thank you! The AI system and admins have been notified to moderate this question.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <h3 className="mb-2 d-flex align-items-center gap-2">
+                  <AlertTriangle className="text-warning animate-pulse" size={24} />
+                  Report Question | प्रश्न रिपोर्ट
+                </h3>
+                <p className="text-secondary small mb-4">
+                  Identify the issue with this question to trigger admin review and auto-correction.
+                </p>
+
+                <div className="form-group mb-3">
+                  <label className="small font-bold text-muted">Reason | कारण</label>
+                  <select 
+                    value={flagReason} 
+                    onChange={(e) => setFlagReason(e.target.value)}
+                    className="wizard-select mt-1"
+                  >
+                    <option value="incorrect_answer">Incorrect Answer (गलत उत्तर)</option>
+                    <option value="vague_question">Vague Question (अस्पष्ट प्रश्न)</option>
+                    <option value="grammar_typo">Grammar / Typo (व्याकरण वा टाइपो)</option>
+                    <option value="out_of_topic">Out of Topic (अप्रासंगिक विषय)</option>
+                  </select>
+                </div>
+
+                <div className="form-group mb-4">
+                  <label className="small font-bold text-muted">Comment | विवरण</label>
+                  <textarea
+                    value={flagComment}
+                    onChange={(e) => setFlagComment(e.target.value)}
+                    placeholder="Briefly describe what makes this incorrect..."
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15, 23, 42, 0.6)',
+                      border: '1px solid var(--glass-border)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '12px 16px',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.95rem',
+                      outline: 'none',
+                      resize: 'none',
+                      marginTop: '4px'
+                    }}
+                  />
+                </div>
+
+                <div className="d-flex gap-3">
+                  <button 
+                    onClick={() => setFlagModalOpen(false)}
+                    className="btn btn-secondary flex-1"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleSubmitFlag}
+                    className="btn btn-primary flex-1"
+                    disabled={flagLoading}
+                  >
+                    {flagLoading ? 'Submitting...' : 'Submit Report'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
