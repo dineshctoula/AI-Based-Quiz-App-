@@ -24,6 +24,8 @@ model User {
   // Relations: One user can create many quizzes and have many attempts
   quizzes   Quiz[]
   attempts  Attempt[]
+  flags     Flag[]
+  role      String   @default("USER") // Role for authorization (USER or ADMIN)
 }
 
 // ==========================================
@@ -46,6 +48,7 @@ model Quiz {
   // Relations: One quiz can contain multiple questions and multiple attempts
   questions   Question[]
   attempts    Attempt[]
+  flags       Flag[]
 }
 
 // ==========================================
@@ -84,3 +87,24 @@ model Attempt {
   // Format: [{ "questionId": 1, "selected": "Paris", "isCorrect": true }]
   answers     Json
 }
+
+// ==========================================
+// 5. Flag Model (फ्ल्याग / रिपोर्ट तालिका)
+// ==========================================
+// Records reports submitted by users on a quiz.
+model Flag {
+  id         Int      @id @default(autoincrement())
+  reason     String   // The reason for flagging (e.g. "incorrect_answer", "typo", "other")
+  comment    String?  // Additional details/comments
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations: Linked to user who flagged and quiz that is flagged
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  quizId     Int
+  quiz       Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+}
+
