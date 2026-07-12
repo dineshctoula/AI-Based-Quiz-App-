@@ -8,6 +8,7 @@ import { PlayQuizPage } from './pages/PlayQuizPage';
 import { QuizResultPage } from './pages/QuizResultPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { MultiplayerPage } from './pages/MultiplayerPage';
+import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -17,7 +18,7 @@ import './App.css';
   * AppContent contains the application layout, navbar, routes, and consumes AuthContext.
   */
  const AppContent: React.FC = () => {
-   const { user, logout } = useAuth();
+   const { user, logout, isAdmin } = useAuth();
  
    return (
      // Router keeps track of navigation history
@@ -52,6 +53,11 @@ import './App.css';
                    <Link to="/multiplayer" className="nav-link">
                      Multiplayer
                    </Link>
+                   {isAdmin && (
+                     <Link to="/admin" className="nav-link" style={{ color: 'var(--secondary)', fontWeight: 'bold' }}>
+                       Admin
+                     </Link>
+                   )}
                  </>
                )}
  
@@ -145,6 +151,16 @@ import './App.css';
                element={
                  <ProtectedRoute>
                    <MultiplayerPage />
+                 </ProtectedRoute>
+               } 
+             />
+
+             {/* Protected: Admin Dashboard page wrapped in ProtectedRoute */}
+             <Route 
+               path="/admin" 
+               element={
+                 <ProtectedRoute>
+                   <AdminDashboardPage />
                  </ProtectedRoute>
                } 
              />

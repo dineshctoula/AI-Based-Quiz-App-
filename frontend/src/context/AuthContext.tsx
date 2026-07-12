@@ -4,11 +4,11 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 // backend चलिरहेको port 5000 को URL
 const API_URL = 'http://localhost:5000/api';
 
-// Interface for User data model
 interface User {
   id: number;
   name: string;
   email: string;
+  role: string; // User role (USER or ADMIN)
 }
 
 // Context state contract/schema
@@ -16,6 +16,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
+  isAdmin: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -136,8 +137,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  const isAdmin = user?.role === 'ADMIN';
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, isAdmin, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );
