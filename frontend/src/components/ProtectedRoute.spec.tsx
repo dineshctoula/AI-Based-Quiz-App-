@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import React from 'react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
 import { useAuth } from '../context/AuthContext';
@@ -25,6 +24,7 @@ describe('ProtectedRoute Component', () => {
       token: null,
       isAdmin: false,
       login: vi.fn(),
+      signup: vi.fn(),
       logout: vi.fn(),
     });
 
@@ -46,6 +46,7 @@ describe('ProtectedRoute Component', () => {
       token: null,
       isAdmin: false,
       login: vi.fn(),
+      signup: vi.fn(),
       logout: vi.fn(),
     });
 
@@ -80,6 +81,7 @@ describe('ProtectedRoute Component', () => {
       token: 'jwt-token',
       isAdmin: false,
       login: vi.fn(),
+      signup: vi.fn(),
       logout: vi.fn(),
     });
 
