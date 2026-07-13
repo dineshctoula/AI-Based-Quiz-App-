@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 // मुख्य entry point function (server start गर्ने ठाउँ)
 async function bootstrap() {
@@ -10,6 +11,9 @@ async function bootstrap() {
 
   // सबै routes अगाडि '/api' prefix थप्ने (जस्तै /api/users)
   app.setGlobalPrefix('api');
+
+  // Global Exception Filter apply गर्ने
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   // Validation validation pipes globally apply गर्ने
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
