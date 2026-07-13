@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
+import { CacheService } from '../common/cache.service';
 import { GenerateQuizDto } from './dto/generate-quiz.dto';
 import { SubmitAttemptDto } from './dto/submit-attempt.dto';
 import { AskTutorDto } from './dto/ask-tutor.dto';
@@ -16,6 +17,7 @@ export class QuizzesService {
   constructor(
     private prisma: PrismaService,
     private aiService: AiService,
+    private cacheService: CacheService,
   ) {}
 
   /**
@@ -70,6 +72,9 @@ export class QuizzesService {
       });
 
       this.logger.log(`Successfully generated and saved quiz ID: ${createdQuiz.id} with ${createdQuiz.questions.length} questions.`);
+      // Invalidate public quizzes cache upon generating new quiz
+      // नयाँ quiz बनेपछि public quizzes cache लाई clear गर्ने
+      this.cacheService.del('public_quizzes');
       return createdQuiz;
     } catch (error) {
       this.logger.error(`Failed to generate quiz for user ${userId}`, error);
@@ -87,8 +92,16 @@ export class QuizzesService {
    * @returns List of all quizzes (सबै quiz हरूको सूची)
    */
   async findAll() {
-    this.logger.log('Retrieving all quizzes');
-    return this.prisma.quiz.findMany({
+    // Check if the public quizzes list is cached
+    // public quizzes को list cache मा छ कि छैन चेक गर्ने
+    const cachedQuizzes = this.cacheService.get<any[]>('public_quizzes');
+    if (cachedQuizzes) {
+      this.logger.log('Returning cached public quizzes list');
+      return cachedQuizzes;
+    }
+
+    this.logger.log('Retrieving all quizzes from database');
+    const quizzes = await this.prisma.quiz.findMany({
       include: {
         creator: {
           select: {
@@ -106,6 +119,11 @@ export class QuizzesService {
         createdAt: 'desc',
       },
     });
+
+    // Cache the retrieved quizzes for 300 seconds (5 minutes)
+    // तानिएका quizzes लाई ३०० सेकेन्ड (५ मिनेट) को लागि cache गर्ने
+    this.cacheService.set('public_quizzes', quizzes, 300);
+    return quizzes;
   }
 
   /**
@@ -219,6 +237,9 @@ export class QuizzesService {
     });
 
     this.logger.log(`Attempt graded successfully for user ${userId}. Score: ${score}%`);
+    // Invalidate global leaderboard cache because rankings might change
+    // ranking परिवर्तन हुन सक्ने हुनाले global leaderboard cache लाई clear गर्ने
+    this.cacheService.del('global_leaderboard');
     return attempt;
   }
 
@@ -263,7 +284,15 @@ export class QuizzesService {
    * @returns Top 10 user rankings (शीर्ष १० user हरूको र्‍याङ्किङ)
    */
   async getLeaderboard() {
-    this.logger.log('Calculating global leaderboard rankings');
+    // Check if the leaderboard is cached
+    // leaderboard cache मा छ कि छैन चेक गर्ने
+    const cachedLeaderboard = this.cacheService.get<any[]>('global_leaderboard');
+    if (cachedLeaderboard) {
+      this.logger.log('Returning cached global leaderboard');
+      return cachedLeaderboard;
+    }
+
+    this.logger.log('Calculating global leaderboard rankings from database');
     try {
       // Fetch all users with their attempts to calculate averages
       // सबै user हरू र तिनीहरूका attempts database बाट तान्ने
@@ -307,6 +336,9 @@ export class QuizzesService {
         })
         .slice(0, 10); // Return top 10
 
+      // Cache the rankings for 60 seconds (1 minute)
+      // rankings लाई ६० सेकेन्ड (१ मिनेट) को लागि cache गर्ने
+      this.cacheService.set('global_leaderboard', rankings, 60);
       return rankings;
     } catch (error) {
       this.logger.error('Failed to calculate leaderboard', error);
@@ -612,9 +644,13 @@ export class QuizzesService {
     if (!user) {
       throw new NotFoundException(`User with ID ${userId} not found | ID ${userId} भएको प्रयोगकर्ता भेटिएन`);
     }
-    return this.prisma.user.delete({
+    const deletedUser = await this.prisma.user.delete({
       where: { id: userId }
     });
+    // Invalidate global leaderboard cache when user is deleted
+    // user delete भएपछि global leaderboard cache clear गर्ने
+    this.cacheService.del('global_leaderboard');
+    return deletedUser;
   }
 
   /**
@@ -674,9 +710,13 @@ export class QuizzesService {
     if (!quiz) {
       throw new NotFoundException(`Quiz with ID ${quizId} not found | ID ${quizId} भएको क्विज भेटिएन`);
     }
-    return this.prisma.quiz.delete({
+    const deletedQuiz = await this.prisma.quiz.delete({
       where: { id: quizId }
     });
+    // Invalidate public quizzes cache when quiz is deleted
+    // quiz delete भएपछि public quizzes cache clear गर्ने
+    this.cacheService.del('public_quizzes');
+    return deletedQuiz;
   }
 
   /**
@@ -730,6 +770,10 @@ export class QuizzesService {
       where: { id: flagId },
       data: { resolved: true }
     });
+
+    // Invalidate public quizzes cache when a question in a quiz is corrected
+    // quiz को प्रश्न सच्याएपछि public quizzes cache लाई clear गर्ने
+    this.cacheService.del('public_quizzes');
 
     return updatedQuestion;
   }

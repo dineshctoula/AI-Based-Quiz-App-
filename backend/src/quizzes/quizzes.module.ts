@@ -6,6 +6,7 @@ import { AiModule } from '../ai/ai.module';
 import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
 import { QuizzesBattleGateway } from './quizzes-battle.gateway';
+import { CacheService } from '../common/cache.service';
 
 /**
  * QuizzesModule compiles the controllers and providers for quiz management.
@@ -18,6 +19,6 @@ import { QuizzesBattleGateway } from './quizzes-battle.gateway';
 @Module({
   imports: [PrismaModule, AiModule, UsersModule, AuthModule],
   controllers: [QuizzesController],
-  providers: [QuizzesService, QuizzesBattleGateway],
+  providers: [QuizzesService, QuizzesBattleGateway, CacheService],
 })
 export class QuizzesModule {}
