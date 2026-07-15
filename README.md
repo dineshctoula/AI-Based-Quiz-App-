@@ -44,6 +44,57 @@ npm run dev
 
 ---
 
+## Production Deployment (Docker Compose)
+
+To spin up the entire application in production mode, you can use the production docker-compose file. Make sure you have Docker installed and running.
+
+### 1. Build and Start Services
+Configure your `GEMINI_API_KEY` in the host environment or edit the `docker-compose.prod.yml` file, then run:
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+### 2. Services Access
+- **Frontend**: http://localhost (Port 80)
+- **Backend API**: http://localhost:5000/api
+- **Postgres Database**: Local port 5432 (Internal to Docker)
+
+### 3. Running Migrations & Seeding
+Prisma migrations are automatically applied on startup within the backend container. If you need to seed the default admin user:
+```bash
+docker exec -it quiz_backend_prod npx prisma db seed
+```
+
+---
+
+## Environment Variables Configuration
+
+| Variable | Scope | Description | Default |
+|---|---|---|---|
+| `DATABASE_URL` | Backend / Prisma | Connection string to PostgreSQL instance | `postgresql://quiz_user:quiz_password_123@postgres_prod:5432/quiz_db_prod?schema=public` |
+| `PORT` | Backend | Port backend service listens on | `5000` |
+| `NODE_ENV` | Backend | Node environment (development/production) | `production` |
+| `JWT_SECRET` | Backend | Secret key used to sign JWT session tokens | `production_secure_jwt_secret_token_123_456` |
+| `GEMINI_API_KEY` | Backend | Google Gemini AI Developer API key | *Required* |
+| `FRONTEND_URL` | Backend | URL of the React client (used for CORS restriction) | `http://localhost` |
+
+---
+
+## System Architecture
+
+```mermaid
+graph TD
+    Client[Browser / React Client] -->|HTTP Port 80| Nginx[Nginx Web Server]
+    Client -->|HTTP API Port 5000 /api| Backend[NestJS Backend Service]
+    Client -->|WebSocket Port 5000| Gateway[QuizzesBattleGateway WS]
+    Nginx -->|Serves Static Files| Client
+    Backend -->|Prisma Client| DB[(PostgreSQL Database)]
+    Backend -->|SDK calls| Gemini[Google Gemini AI API]
+    Gateway -->|In-memory Rooms| Memory[Lobby Store Map]
+```
+
+---
+
 ## 15-Day Milestone Tracker
 
 Refer to the developer tracking sheets in the repository workspace log files for daily status, commits, and verification results.
